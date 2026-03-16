@@ -27,22 +27,43 @@ class ImageLikeBottomNavBar extends StatelessWidget {
                 animationDuration: const Duration(milliseconds: 300),
                 animationCurve: Curves.easeInOut,
                 items: [
-                  const _NavIcon(icon: Icons.home, label: "Home"),
-                  const _NavIcon(icon: Icons.description_outlined, label: "Tasks"),
-                  // ✅ Calendar item with fixed size so circle stays big
+                  _NavImage(
+                    imagePath: "assets/images/home.png",
+                    label: "Home",
+                    isSelected: selectedIndex == 0,
+                  ),
+                  _NavImage(
+                    imagePath: "assets/images/tasks.png",
+                    label: "Tasks",
+                    isSelected: selectedIndex == 1,
+                  ),
+
                   SizedBox(
                     width: 48,
                     height: 48,
                     child: Center(
-                      child: Icon(
-                        Icons.calendar_month,
-                        size: 24,
-                        color: Colors.white,
+                      child: Image.asset(
+                        "assets/images/calender.png",
+                        width: 28,
+                        height: 28,
+                        fit: BoxFit.contain,
+                        color: selectedIndex == 2
+                            ? Colors.white
+                            : Colors.white,
                       ),
                     ),
                   ),
-                  const _NavIcon(icon: Icons.map_outlined, label: "Phases"),
-                  const _NavIcon(icon: Icons.person_outline, label: "More"),
+
+                  _NavImage(
+                    imagePath: "assets/images/phases.png",
+                    label: "Phases",
+                    isSelected: selectedIndex == 3,
+                  ),
+                  _NavImage(
+                    imagePath: "assets/images/more.png",
+                    label: "More",
+                    isSelected: selectedIndex == 4,
+                  ),
                 ],
                 onTap: (index) {
                   selectedPageNotifier.value = index;
@@ -57,11 +78,16 @@ class ImageLikeBottomNavBar extends StatelessWidget {
   }
 }
 
-class _NavIcon extends StatelessWidget {
-  final IconData icon;
+class _NavImage extends StatelessWidget {
+  final String imagePath;
   final String label;
+  final bool isSelected;
 
-  const _NavIcon({required this.icon, required this.label});
+  const _NavImage({
+    required this.imagePath,
+    required this.label,
+    required this.isSelected,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -69,13 +95,19 @@ class _NavIcon extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Icon(icon, size: 24, color: Colors.white),
+        Image.asset(
+          imagePath,
+          width: 24,
+          height: 24,
+          fit: BoxFit.contain,
+          color: isSelected ? Colors.white : Colors.white,
+        ),
         const SizedBox(height: 1),
         Text(
           label,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 10,
-            color: Colors.white,
+            color: isSelected ? Colors.white: Colors.white.withOpacity(0.5),
             fontFamily: "Mynor",
             fontWeight: FontWeight.w500,
           ),
