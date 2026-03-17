@@ -12,334 +12,197 @@ class OtpScreen extends StatefulWidget {
 }
 
 class _OtpScreenState extends State<OtpScreen> {
+
   final List<TextEditingController> _otpControllers =
   List.generate(6, (_) => TextEditingController());
-  final List<FocusNode> _otpFocusNodes =
+
+  final List<FocusNode> _focusNodes =
   List.generate(6, (_) => FocusNode());
 
   bool _isLoading = false;
 
   @override
   void dispose() {
-    for (var c in _otpControllers) c.dispose();
-    for (var n in _otpFocusNodes) n.dispose();
+    for (var c in _otpControllers) {
+      c.dispose();
+    }
+    for (var f in _focusNodes) {
+      f.dispose();
+    }
     super.dispose();
   }
 
-  void _onOtpChanged(String value, int index) {
-    if (value.length > 1) {
-      _otpControllers[index].text = value.substring(value.length - 1);
-    }
+  void _onChanged(String val, int index) {
 
-    if (value.isNotEmpty) {
-      if (index + 1 < _otpFocusNodes.length) {
-        _otpFocusNodes[index + 1].requestFocus();
+    if (val.isNotEmpty) {
+      if (index < 5) {
+        _focusNodes[index + 1].requestFocus();
       } else {
-        _otpFocusNodes[index].unfocus();
+        _focusNodes[index].unfocus();
       }
     } else {
-      if (index - 1 >= 0) {
-        _otpFocusNodes[index - 1].requestFocus();
+      if (index > 0) {
+        _focusNodes[index - 1].requestFocus();
       }
     }
-
-    _otpControllers[index].selection = TextSelection.fromPosition(
-      TextPosition(offset: _otpControllers[index].text.length),
-    );
-
-    setState(() {});
   }
 
-  String get _enteredOtp =>
-      _otpControllers.map((c) => c.text.trim()).join();
-
-  Future<void> _handleVerify() async {
-    if (_enteredOtp.length < 6) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text(
-            'Please enter the 6-digit OTP',
-            style: TextStyle(fontFamily: "Mynor"),
-          ),
-          backgroundColor: const Color(0xFF287D80),
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-        ),
-      );
-      return;
-    }
-
-    setState(() => _isLoading = true);
-
-    try {
-      await Future.delayed(const Duration(seconds: 1));
-
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text(
-            'OTP Verified Successfully!',
-            style: TextStyle(fontFamily: "Mynor"),
-          ),
-          backgroundColor: const Color(0xFF287D80),
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-        ),
-      );
-
-      // Next screen navigation yahan add karein
-      // Navigator.of(context).pushReplacement(
-      //   MaterialPageRoute(builder: (context) => const ResetPasswordScreen()),
-      // );
-
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Verification failed: ${e.toString()}',
-            style: const TextStyle(fontFamily: "Mynor"),
-          ),
-          backgroundColor: Colors.red,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-        ),
-      );
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
-  }
-
-  // Sirf digit ki AnimatedSwitcher animation baqi hai
-  Widget _buildOtpBox(int index, double boxSize) {
-    final bool hasValue = _otpControllers[index].text.isNotEmpty;
-
+  Widget _otpBox(int index) {
     return SizedBox(
-      width: boxSize,
-      height: boxSize * 1.25,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          // Real TextField
-          TextFormField(
-            controller: _otpControllers[index],
-            focusNode: _otpFocusNodes[index],
-            autofocus: false,
-            textAlign: TextAlign.center,
-            keyboardType: TextInputType.number,
-            maxLength: 1,
-            style: const TextStyle(
-              color: Colors.transparent,
-              fontSize: 20,
-              fontFamily: "Mynor",
-              fontWeight: FontWeight.w800,
-            ),
-            cursorColor: const Color(0xFF6FE6E4),
-            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-            decoration: InputDecoration(
-              counterText: '',
-              filled: true,
-              fillColor: Colors.white.withOpacity(0.08),
-              contentPadding: const EdgeInsets.symmetric(vertical: 10),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(14),
-                borderSide: BorderSide(
-                  color: Colors.white.withOpacity(0.45),
-                  width: 1.2,
-                ),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(14),
-                borderSide: const BorderSide(
-                  color: Color(0xFF6FE6E4),
-                  width: 1.8,
-                ),
-              ),
-            ),
-            onChanged: (val) => _onOtpChanged(val, index),
-          ),
-
-          // Digit AnimatedSwitcher — sirf yahi animation baqi hai
-          AnimatedSwitcher(
-            duration: const Duration(milliseconds: 220),
-            transitionBuilder: (child, animation) => ScaleTransition(
-              scale: animation,
-              child: FadeTransition(opacity: animation, child: child),
-            ),
-            child: hasValue
-                ? Text(
-              _otpControllers[index].text,
-              key: ValueKey<String>(_otpControllers[index].text),
-              style: const TextStyle(
-                fontSize: 20,
-                fontFamily: "Mynor",
-                fontWeight: FontWeight.w800,
-                color: Colors.white,
-              ),
-            )
-                : SizedBox(
-              key: const ValueKey<String>('empty'),
-              width: boxSize * 0.01,
-              height: boxSize * 0.01,
-            ),
-          ),
+      width: 45,
+      height: 48,
+      child: TextField(
+        controller: _otpControllers[index],
+        focusNode: _focusNodes[index],
+        textAlign: TextAlign.center,
+        keyboardType: TextInputType.number,
+        maxLength: 1,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 18,
+          fontFamily: "Mynor",
+          fontWeight: FontWeight.w800,
+        ),
+        cursorColor: const Color(0xFF6FE6E4),
+        inputFormatters: [
+          FilteringTextInputFormatter.digitsOnly
         ],
+        decoration: InputDecoration(
+          counterText: "",
+          filled: true,
+          fillColor: Color(0xFF287D80).withOpacity(0.3),
+          contentPadding: const EdgeInsets.only(bottom: 8),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide.none,
+          ),
+        ),
+        onChanged: (v) => _onChanged(v, index),
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
+
     final mq = MediaQuery.of(context).size;
-    final double boxSize = mq.width * 0.123;
 
     return Scaffold(
       body: Bg(
         child: SafeArea(
-          child: SingleChildScrollView(
-            physics: const BouncingScrollPhysics(),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 22),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: SingleChildScrollView(
+              physics: BouncingScrollPhysics(),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  SizedBox(height: mq.height * 0.038),
 
-                  // Back button
-                  BackCircle(onTap: () => Navigator.pop(context)),
+                  SizedBox(height: mq.height * 0.035),
 
-                  SizedBox(height: mq.height * 0.03),
+                  /// Top Bar
+                  Row(
+                    children: [
 
-                  // Logo
-                  Center(
-                    child: Container(
-                      height: 155,
-                      width: 160,
-                      decoration: const BoxDecoration(
-                        shape: BoxShape.circle,
-                        image: DecorationImage(
-                          image: AssetImage("assets/images/Logo.png"),
+                      BackCircle(onTap: () => Navigator.pop(context)),
+                      SizedBox(width: mq.width*0.03,),
+
+
+                      const Text(
+                        "Forget Password",
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontFamily: "Mynor",
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white,
                         ),
                       ),
+                      SizedBox(width: mq.width*0.12,),
+
+
+                      Image.asset(
+                        "assets/images/Logo.png",
+                        height: 45,
+                        width: 44,
+                      )
+                    ],
+                  ),
+
+                  SizedBox(height: mq.height * 0.09),
+
+                  /// Lock Icon
+                  Center(
+                    child: Image.asset(
+                      "assets/images/lock.png",
+                      height: 166,
+                      width: 135,
                     ),
                   ),
 
-                  SizedBox(height: mq.height * 0.04),
+                  SizedBox(height: mq.height * 0.08),
 
-                  // Title
+                  /// Title
                   const Text(
-                    "Enter OTP Code",
+                    "Enter Code",
                     style: TextStyle(
-                      fontSize: 20,
+                      fontSize: 18,
                       fontFamily: "Mynor",
                       fontWeight: FontWeight.w800,
                       color: Colors.white,
                     ),
                   ),
 
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 8),
 
-                  // Subtitle
+                  /// Subtitle
                   const Text(
-                    "Enter code to verify your identity",
+                    "Enter Code to Verify",
                     style: TextStyle(
-                      fontSize: 13,
+                      fontSize: 10,
                       fontFamily: "Mynor",
                       fontWeight: FontWeight.w600,
                       color: Colors.white,
-                      height: 1.5,
                     ),
                   ),
 
                   SizedBox(height: mq.height * 0.03),
 
-                  // OTP Boxes
+                  /// OTP Boxes
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: List.generate(
                       6,
-                          (i) => _buildOtpBox(i, boxSize),
+                          (index) => _otpBox(index),
                     ),
                   ),
-
-                  SizedBox(height: mq.height * 0.025),
-
-                  // Resend OTP
-                  Center(
-                    child: GestureDetector(
-                      onTap: () {
-                        // Resend logic yahan add karein
-                      },
-                      child: RichText(
-                        text: TextSpan(
-                          children: [
-                            TextSpan(
-                              text: "Didn't receive the code? ",
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontFamily: "Mynor",
-                                fontWeight: FontWeight.w600,
-                                color: Colors.white.withOpacity(0.75),
-                              ),
-                            ),
-                            const TextSpan(
-                              text: "Resend",
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontFamily: "Mynor",
-                                fontWeight: FontWeight.w900,
-                                color: Color(0xFF6FE6E4),
-                                decoration: TextDecoration.underline,
-                                decorationColor: Color(0xFF6FE6E4),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-
                   SizedBox(height: mq.height * 0.03),
-
-                  // Verify Button
+                  /// Verify Button
                   SizedBox(
                     width: double.infinity,
                     height: 45,
                     child: ElevatedButton(
-                      onPressed: (){
-                        Navigator.push(context, MaterialPageRoute(builder: (context)=>UpdatePasswordScreen()));
+                      onPressed: () {
+
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) =>
+                                UpdatePasswordScreen(),
+                          ),
+                        );
+
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF287D80),
-                        disabledBackgroundColor:
-                        const Color(0xFF287D80).withOpacity(0.6),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(28),
                         ),
                         elevation: 0,
                       ),
-                      child: _isLoading
-                          ? const SizedBox(
-                        height: 22,
-                        width: 22,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2.2,
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                            Colors.white,
-                          ),
-                        ),
-                      )
-                          : const Text(
-                        "Verify OTP",
+                      child: const Text(
+                        "Verify",
                         style: TextStyle(
-                          fontSize: 15,
+                          fontSize: 16,
                           fontFamily: "Mynor",
                           fontWeight: FontWeight.w800,
                           color: Colors.white,
@@ -348,7 +211,8 @@ class _OtpScreenState extends State<OtpScreen> {
                     ),
                   ),
 
-                  SizedBox(height: mq.height * 0.03),
+                  SizedBox(height: mq.height * 0.05),
+
                 ],
               ),
             ),

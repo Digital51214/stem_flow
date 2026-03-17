@@ -33,7 +33,7 @@ class _JoinTeamScreenState extends State<JoinTeamScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const SizedBox(height: 18),
+                  SizedBox(height: mq.height * 0.035),
                   Row(children: [BackCircle(onTap: () => Navigator.pop(context)),
                     Spacer(),
                     Container(

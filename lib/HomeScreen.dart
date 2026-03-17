@@ -7,6 +7,7 @@ class HomeScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final mq =MediaQuery.of(context).size;
     return Scaffold(
       body: Bg(
         child: Stack(
@@ -33,7 +34,7 @@ class HomeScreen extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    const SizedBox(height: 12),
+                    SizedBox(height: mq.height * 0.035),
         
                     // ✅ Top Right Notification Button
                     Row(

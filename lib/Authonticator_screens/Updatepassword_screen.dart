@@ -135,63 +135,56 @@ class _UpdatePasswordScreenState extends State<UpdatePasswordScreen> {
           child: SingleChildScrollView(
             physics: const BouncingScrollPhysics(),
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 22),
+              padding: const EdgeInsets.symmetric(horizontal: 20),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  SizedBox(height: mq.height * 0.038),
+                  SizedBox(height: mq.height * 0.035),
 
                   // Back button
-                  BackCircle(onTap: () => Navigator.pop(context)),
+                  Row(
+                    children: [
 
-                  SizedBox(height: mq.height * 0.03),
+                      BackCircle(onTap: () => Navigator.pop(context)),
+                      SizedBox(width: mq.width*0.03,),
+
+
+                      const Text(
+                        "Update Password",
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontFamily: "Mynor",
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white,
+                        ),
+                      ),
+                      SizedBox(width: mq.width*0.1,),
+
+
+                      Image.asset(
+                        "assets/images/Logo.png",
+                        height: 45,
+                        width: 44,
+                      )
+                    ],
+                  ),
+
+                  SizedBox(height: mq.height * 0.09),
 
                   // Logo
                   Center(
-                    child: Container(
-                      height: 155,
-                      width: 160,
-                      decoration: const BoxDecoration(
-                        shape: BoxShape.circle,
-                        image: DecorationImage(
-                          image: AssetImage("assets/images/Logo.png"),
-                        ),
-                      ),
+                    child: Image.asset(
+                      "assets/images/lock.png",
+                      height: 166,
+                      width: 135,
                     ),
                   ),
 
-                  SizedBox(height: mq.height * 0.04),
-
-                  // Title
-                  const Text(
-                    "Update Password",
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontFamily: "Mynor",
-                      fontWeight: FontWeight.w800,
-                      color: Colors.white,
-                    ),
-                  ),
-
-                  const SizedBox(height: 6),
-
-                  // Subtitle
-                  const Text(
-                    "Enter your new password to update",
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontFamily: "Mynor",
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white,
-                      height: 1.5,
-                    ),
-                  ),
-
-                  SizedBox(height: mq.height * 0.04),
+                  SizedBox(height: mq.height * 0.101),
 
                   // Password field
                   _roundedField(
-                    hint: "New Password...",
+                    hint: "Enter New Password...",
                     controller: _passwordC,
                     obscureText: _obscurePassword,
                     suffix: IconButton(
@@ -211,7 +204,7 @@ class _UpdatePasswordScreenState extends State<UpdatePasswordScreen> {
 
                   // Confirm Password field
                   _roundedField(
-                    hint: "Confirm Password...",
+                    hint: "Confirm New Password...",
                     controller: _confirmC,
                     obscureText: _obscureConfirm,
                     suffix: IconButton(
@@ -227,7 +220,7 @@ class _UpdatePasswordScreenState extends State<UpdatePasswordScreen> {
                     ),
                   ),
 
-                  SizedBox(height: mq.height * 0.04),
+                  SizedBox(height: mq.height * 0.042),
 
                   // Update Button
                   SizedBox(
@@ -259,7 +252,7 @@ class _UpdatePasswordScreenState extends State<UpdatePasswordScreen> {
                         ),
                       )
                           : const Text(
-                        "Update Password",
+                        "Change",
                         style: TextStyle(
                           fontSize: 15,
                           fontFamily: "Mynor",

@@ -14,7 +14,7 @@ class PrivacypolicyScreen extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 18.0),
           child: Column(
             children: [
-              SizedBox(height: 18,),
+              SizedBox(height: mqsize.height * 0.035),
               Row(
                 children: [
                   BackCircle(onTap: (){

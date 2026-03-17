@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:stemflow/Authonticator_screens/Verify_screen.dart';
 import 'package:stemflow/Widgets/background.dart';
-
 import '../Widgets/backcircle.dart';
 
 class ForgetpasswordScreen extends StatefulWidget {
@@ -12,6 +11,7 @@ class ForgetpasswordScreen extends StatefulWidget {
 }
 
 class _ForgetpasswordScreenState extends State<ForgetpasswordScreen> {
+
   final TextEditingController emailC = TextEditingController();
   bool _isLoading = false;
 
@@ -23,6 +23,7 @@ class _ForgetpasswordScreenState extends State<ForgetpasswordScreen> {
 
   @override
   Widget build(BuildContext context) {
+
     final mq = MediaQuery.of(context).size;
 
     return Scaffold(
@@ -31,79 +32,107 @@ class _ForgetpasswordScreenState extends State<ForgetpasswordScreen> {
           child: SingleChildScrollView(
             physics: const BouncingScrollPhysics(),
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 22),
+              padding: const EdgeInsets.symmetric(horizontal: 20),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  SizedBox(height: mq.height * 0.038),
-                  BackCircle(onTap: () => Navigator.pop(context)),
-                  SizedBox(height: mq.height*0.03,),
 
+                  SizedBox(height: mq.height * 0.035),
 
-                  // Logo Circle — same as SignupScreen
-                  Center(
-                    child: Container(
-                      height: 155,
-                      width: 160,
-                      decoration: const BoxDecoration(
-                        shape: BoxShape.circle,
-                        image: DecorationImage(
-                          image: AssetImage("assets/images/Logo.png"),
+                  /// Top Row
+                  Row(
+                    children: [
+
+                      BackCircle(onTap: () => Navigator.pop(context)),
+                      SizedBox(width: mq.width*0.03,),
+
+                      const Text(
+                        "Forget Password",
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontFamily: "Mynor",
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white,
                         ),
                       ),
+                      SizedBox(width: mq.width*0.12,),
+
+                      Image.asset(
+                        "assets/images/Logo.png",
+                        height: 45,
+                        width: 44,
+                      )
+
+                    ],
+                  ),
+
+                  SizedBox(height: mq.height * 0.09),
+
+                  /// Lock Image
+                  Center(
+                    child: Image.asset(
+                      "assets/images/lock.png",
+                      height: 166,
+                      width: 135,
                     ),
                   ),
 
                   SizedBox(height: mq.height * 0.08),
 
-                  // Title
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: const Text(
-                      "Verify your identity",
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontFamily: "Mynor",
-                        fontWeight: FontWeight.w800,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 6),
-
-                  // Subtitle
+                  /// Title
                   const Text(
-                    "Enter email to find your account",
+                    "Verify Your Identity",
                     style: TextStyle(
-                      fontSize: 14,
+                      fontSize: 19,
                       fontFamily: "Mynor",
-                      fontWeight: FontWeight.w600,
+                      fontWeight: FontWeight.w800,
                       color: Colors.white,
                     ),
                   ),
 
-                  SizedBox(height: mq.height * 0.04),
+                  const SizedBox(height: 8),
 
-                  // Email field
+                  /// Subtitle
+                  const Text(
+                    "Enter Your mail to vefry your identity",
+                    style: TextStyle(
+                      fontSize: 10.5,
+                      fontFamily: "Mynor",
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white70,
+                    ),
+                  ),
+
+                  SizedBox(height: mq.height * 0.03),
+
+                  /// Email Field
                   _roundedField(
                     hint: "Email Address...",
                     controller: emailC,
                     keyboardType: TextInputType.emailAddress,
                   ),
 
-                  SizedBox(height: mq.height * 0.04),
+                  SizedBox(height: mq.height * 0.03),
 
-                  // Send OTP Button
+                  /// Button
                   SizedBox(
                     width: double.infinity,
                     height: 45,
                     child: ElevatedButton(
+
                       onPressed: _isLoading
                           ? null
                           : () {
-                        Navigator.push(context, MaterialPageRoute(builder: (context)=>OtpScreen()));
+
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => OtpScreen(),
+                          ),
+                        );
+
                       },
+
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF287D80),
                         disabledBackgroundColor:
@@ -113,21 +142,21 @@ class _ForgetpasswordScreenState extends State<ForgetpasswordScreen> {
                         ),
                         elevation: 0,
                       ),
+
                       child: _isLoading
                           ? const SizedBox(
                         height: 22,
                         width: 22,
                         child: CircularProgressIndicator(
-                          strokeWidth: 2.2,
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                            Colors.white,
-                          ),
+                          strokeWidth: 2,
+                          valueColor:
+                          AlwaysStoppedAnimation<Color>(Colors.white),
                         ),
                       )
                           : const Text(
-                        "Send OTP",
+                        "Send Code",
                         style: TextStyle(
-                          fontSize: 15,
+                          fontSize: 16,
                           fontFamily: "Mynor",
                           fontWeight: FontWeight.w800,
                           color: Colors.white,
@@ -135,6 +164,7 @@ class _ForgetpasswordScreenState extends State<ForgetpasswordScreen> {
                       ),
                     ),
                   ),
+
                 ],
               ),
             ),
@@ -144,6 +174,7 @@ class _ForgetpasswordScreenState extends State<ForgetpasswordScreen> {
     );
   }
 
+  /// Rounded Field
   Widget _roundedField({
     required String hint,
     required TextEditingController controller,
@@ -151,17 +182,18 @@ class _ForgetpasswordScreenState extends State<ForgetpasswordScreen> {
     bool obscureText = false,
     Widget? suffix,
   }) {
+
     return Container(
       height: 45,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(30),
         border: Border.all(
-          color: Colors.white.withOpacity(0.55),
+          color: Colors.white.withOpacity(0.6),
           width: 1.2,
         ),
         color: Colors.white.withOpacity(0.08),
       ),
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 18),
       child: Center(
         child: TextField(
           controller: controller,
@@ -178,7 +210,7 @@ class _ForgetpasswordScreenState extends State<ForgetpasswordScreen> {
             hintText: hint,
             hintStyle: TextStyle(
               color: Colors.white.withOpacity(0.75),
-              fontSize: 10,
+              fontSize: 12,
               fontFamily: "Mynor",
               fontWeight: FontWeight.w600,
             ),
