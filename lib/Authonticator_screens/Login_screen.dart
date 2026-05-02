@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:stemflow/Authonticator_screens/ForgetPAssword_screen.dart';
 import 'package:stemflow/Authonticator_screens/SignUP_screen.dart';
+import 'package:stemflow/services/login_service.dart';
+import 'package:stemflow/services/session_manager.dart';
 import 'package:stemflow/team_management_screen/teamstep1_screen.dart';
+import 'package:stemflow/widgets/custom_toast.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -16,12 +19,120 @@ class _LoginScreenState extends State<LoginScreen> {
 
   bool rememberMe = false;
   bool obscure = true;
+  bool isLoading = false;
 
   @override
   void dispose() {
     emailC.dispose();
     passC.dispose();
     super.dispose();
+  }
+
+  Future<void> loginUser() async {
+    final email = emailC.text.trim();
+    final password = passC.text.trim();
+
+    print("=== LOGIN BUTTON CLICKED ===");
+    print("Email: $email");
+    print("Password: $password");
+    print("Remember Me: $rememberMe");
+
+    if (email.isEmpty) {
+      CustomToast.show(
+        context: context,
+        message: "Please enter email",
+        type: ToastType.error,
+      );
+      return;
+    }
+
+    if (!email.contains("@")) {
+      CustomToast.show(
+        context: context,
+        message: "Please enter valid email",
+        type: ToastType.error,
+      );
+      return;
+    }
+
+    if (password.isEmpty) {
+      CustomToast.show(
+        context: context,
+        message: "Please enter password",
+        type: ToastType.error,
+      );
+      return;
+    }
+
+    setState(() {
+      isLoading = true;
+    });
+
+    final result = await LoginService.login(
+      email: email,
+      password: password,
+    );
+
+    print("=== FINAL LOGIN RESULT ===");
+    print(result.toString());
+
+    if (result["success"] == true) {
+      final dynamic userDynamic = result["user"];
+
+      print("=== RAW USER FROM LOGIN RESPONSE ===");
+      print(userDynamic);
+      print("User runtimeType: ${userDynamic.runtimeType}");
+
+      if (userDynamic != null && userDynamic is Map) {
+        final Map<String, dynamic> user =
+        Map<String, dynamic>.from(userDynamic);
+
+        print("=== USER MAP TO SAVE ===");
+        print(user);
+
+        await SessionManager.instance.saveUserSession(user);
+
+        final savedEmail = await SessionManager.instance.getEmail();
+        final savedUsername = await SessionManager.instance.getUsername();
+        final savedProfilePic = await SessionManager.instance.getProfilePic();
+
+        print("=== SESSION VERIFY AFTER SAVE ===");
+        print("Saved Email Verify: $savedEmail");
+        print("Saved Username Verify: $savedUsername");
+        print("Saved Profile Pic Verify: $savedProfilePic");
+      } else {
+        print("=== USER DATA NOT SAVED ===");
+        print("Reason: user is null or not a Map");
+      }
+
+      setState(() {
+        isLoading = false;
+      });
+
+      CustomToast.show(
+        context: context,
+        message: result["message"] ?? "Login successful",
+        type: ToastType.success,
+      );
+
+      Future.delayed(const Duration(milliseconds: 800), () {
+        if (!mounted) return;
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const TeamStep1Screen()),
+        );
+      });
+    } else {
+      setState(() {
+        isLoading = false;
+      });
+
+      CustomToast.show(
+        context: context,
+        message: result["message"] ?? "Login failed",
+        type: ToastType.error,
+      );
+    }
   }
 
   @override
@@ -47,22 +158,19 @@ class _LoginScreenState extends State<LoginScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   SizedBox(height: mq.height * 0.06),
-
-                  // Logo Circle
                   Center(
                     child: Container(
                       height: 155,
                       width: 160,
-                      decoration: BoxDecoration(
+                      decoration: const BoxDecoration(
                         shape: BoxShape.circle,
-                     image: DecorationImage(image: AssetImage("assets/images/Logo.png"))
+                        image: DecorationImage(
+                          image: AssetImage("assets/images/Logo.png"),
                         ),
+                      ),
                     ),
                   ),
-
                   SizedBox(height: mq.height * 0.04),
-
-                  // Title
                   const Text(
                     "Sign In",
                     style: TextStyle(
@@ -72,10 +180,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       color: Colors.white,
                     ),
                   ),
-
                   const SizedBox(height: 6),
-
-                  // Subtitle
                   const Text(
                     "Welcome Back! Enter Your Account Details",
                     style: TextStyle(
@@ -85,19 +190,13 @@ class _LoginScreenState extends State<LoginScreen> {
                       color: Colors.white,
                     ),
                   ),
-
                   SizedBox(height: mq.height * 0.025),
-
-                  // Email Field
                   _roundedField(
                     hint: "Email Address...",
                     controller: emailC,
                     keyboardType: TextInputType.emailAddress,
                   ),
-
                   const SizedBox(height: 5),
-
-                  // Password Field
                   _roundedField(
                     hint: "Password....",
                     controller: passC,
@@ -111,10 +210,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ),
                   ),
-
                   const SizedBox(height: 12),
-
-                  // Remember + Forgot
                   Row(
                     children: [
                       GestureDetector(
@@ -156,7 +252,12 @@ class _LoginScreenState extends State<LoginScreen> {
                       const Spacer(),
                       GestureDetector(
                         onTap: () {
-                          Navigator.push(context, MaterialPageRoute(builder: (context)=>ForgetpasswordScreen()));
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const ForgetpasswordScreen(),
+                            ),
+                          );
                         },
                         child: const Text(
                           "Forget Password?",
@@ -170,18 +271,12 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ],
                   ),
-
                   SizedBox(height: mq.height * 0.045),
-
-                  // Sign In Button
                   SizedBox(
                     width: double.infinity,
                     height: 45,
                     child: ElevatedButton(
-                      onPressed: () {
-                        Navigator.push(context, MaterialPageRoute(builder: (context)=>TeamStep1Screen()));
-
-                      },
+                      onPressed: isLoading ? null : loginUser,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF287D80),
                         shape: RoundedRectangleBorder(
@@ -189,7 +284,16 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                         elevation: 0,
                       ),
-                      child: const Text(
+                      child: isLoading
+                          ? const SizedBox(
+                        height: 22,
+                        width: 22,
+                        child: CircularProgressIndicator(
+                          color: Colors.white,
+                          strokeWidth: 2.5,
+                        ),
+                      )
+                          : const Text(
                         "Sign In",
                         style: TextStyle(
                           fontSize: 15,
@@ -200,10 +304,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ),
                   ),
-
                   SizedBox(height: mq.height * 0.165),
-
-                  // Bottom Text
                   Center(
                     child: RichText(
                       text: TextSpan(
@@ -221,8 +322,13 @@ class _LoginScreenState extends State<LoginScreen> {
                             alignment: PlaceholderAlignment.middle,
                             child: GestureDetector(
                               onTap: () {
-                                Navigator.pushAndRemoveUntil(context,MaterialPageRoute(builder: (context)=>SignupScreen()),
-                                        (Route<dynamic>route)=>false);
+                                Navigator.pushAndRemoveUntil(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => const SignupScreen(),
+                                  ),
+                                      (Route<dynamic> route) => false,
+                                );
                               },
                               child: const Text(
                                 "Sign Up",
@@ -240,7 +346,6 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ),
                   ),
-
                   const SizedBox(height: 18),
                 ],
               ),
@@ -271,7 +376,9 @@ class _LoginScreenState extends State<LoginScreen> {
           controller: controller,
           keyboardType: keyboardType,
           obscureText: obscureText,
-          style: const TextStyle(color: Colors.white, fontSize: 14,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 14,
             fontFamily: "Mynor",
           ),
           cursorColor: const Color(0xFF6FE6E4),
@@ -279,7 +386,7 @@ class _LoginScreenState extends State<LoginScreen> {
             border: InputBorder.none,
             hintText: hint,
             hintStyle: TextStyle(
-              color: Colors.white.withOpacity(0.75),
+              color: Colors.white70,
               fontSize: 10,
               fontFamily: "Mynor",
               fontWeight: FontWeight.w600,

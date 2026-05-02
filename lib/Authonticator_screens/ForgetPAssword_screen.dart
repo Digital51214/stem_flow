@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:stemflow/Authonticator_screens/Verify_screen.dart';
+
+import 'package:stemflow/Services/forget_password_service.dart';
 import 'package:stemflow/Widgets/background.dart';
 import '../Widgets/backcircle.dart';
 
@@ -11,7 +13,6 @@ class ForgetpasswordScreen extends StatefulWidget {
 }
 
 class _ForgetpasswordScreenState extends State<ForgetpasswordScreen> {
-
   final TextEditingController emailC = TextEditingController();
   bool _isLoading = false;
 
@@ -21,9 +22,52 @@ class _ForgetpasswordScreenState extends State<ForgetpasswordScreen> {
     super.dispose();
   }
 
+  Future<void> _sendCode() async {
+    final email = emailC.text.trim();
+
+    if (email.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please enter email")),
+      );
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    try {
+      final result = await ForgetPasswordService.forgotPassword(email: email);
+
+      print("Forgot password result: $result");
+
+      if (!mounted) return;
+
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => OtpScreen(
+            email: email,
+            otp: result["otp"].toString(),
+            userId: result["user_id"],
+          ),
+        ),
+      );
+    } catch (e) {
+      print("Forgot password error: $e");
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString().replaceAll("Exception: ", ""))),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-
     final mq = MediaQuery.of(context).size;
 
     return Scaffold(
@@ -36,16 +80,12 @@ class _ForgetpasswordScreenState extends State<ForgetpasswordScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-
                   SizedBox(height: mq.height * 0.035),
 
-                  /// Top Row
                   Row(
                     children: [
-
                       BackCircle(onTap: () => Navigator.pop(context)),
-                      SizedBox(width: mq.width*0.03,),
-
+                      SizedBox(width: mq.width * 0.03),
                       const Text(
                         "Forget Password",
                         style: TextStyle(
@@ -55,20 +95,17 @@ class _ForgetpasswordScreenState extends State<ForgetpasswordScreen> {
                           color: Colors.white,
                         ),
                       ),
-                      SizedBox(width: mq.width*0.12,),
-
+                      SizedBox(width: mq.width * 0.12),
                       Image.asset(
                         "assets/images/Logo.png",
                         height: 45,
                         width: 44,
-                      )
-
+                      ),
                     ],
                   ),
 
                   SizedBox(height: mq.height * 0.09),
 
-                  /// Lock Image
                   Center(
                     child: Image.asset(
                       "assets/images/lock.png",
@@ -79,7 +116,6 @@ class _ForgetpasswordScreenState extends State<ForgetpasswordScreen> {
 
                   SizedBox(height: mq.height * 0.08),
 
-                  /// Title
                   const Text(
                     "Verify Your Identity",
                     style: TextStyle(
@@ -92,7 +128,6 @@ class _ForgetpasswordScreenState extends State<ForgetpasswordScreen> {
 
                   const SizedBox(height: 8),
 
-                  /// Subtitle
                   const Text(
                     "Enter Your mail to vefry your identity",
                     style: TextStyle(
@@ -105,7 +140,6 @@ class _ForgetpasswordScreenState extends State<ForgetpasswordScreen> {
 
                   SizedBox(height: mq.height * 0.03),
 
-                  /// Email Field
                   _roundedField(
                     hint: "Email Address...",
                     controller: emailC,
@@ -114,25 +148,11 @@ class _ForgetpasswordScreenState extends State<ForgetpasswordScreen> {
 
                   SizedBox(height: mq.height * 0.03),
 
-                  /// Button
                   SizedBox(
                     width: double.infinity,
                     height: 45,
                     child: ElevatedButton(
-
-                      onPressed: _isLoading
-                          ? null
-                          : () {
-
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => OtpScreen(),
-                          ),
-                        );
-
-                      },
-
+                      onPressed: _isLoading ? null : _sendCode,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF287D80),
                         disabledBackgroundColor:
@@ -142,7 +162,6 @@ class _ForgetpasswordScreenState extends State<ForgetpasswordScreen> {
                         ),
                         elevation: 0,
                       ),
-
                       child: _isLoading
                           ? const SizedBox(
                         height: 22,
@@ -164,7 +183,6 @@ class _ForgetpasswordScreenState extends State<ForgetpasswordScreen> {
                       ),
                     ),
                   ),
-
                 ],
               ),
             ),
@@ -174,7 +192,6 @@ class _ForgetpasswordScreenState extends State<ForgetpasswordScreen> {
     );
   }
 
-  /// Rounded Field
   Widget _roundedField({
     required String hint,
     required TextEditingController controller,
@@ -182,7 +199,6 @@ class _ForgetpasswordScreenState extends State<ForgetpasswordScreen> {
     bool obscureText = false,
     Widget? suffix,
   }) {
-
     return Container(
       height: 45,
       decoration: BoxDecoration(

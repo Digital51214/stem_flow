@@ -1,10 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:stemflow/Authonticator_screens/Login_screen.dart';
+
 import 'package:stemflow/Widgets/background.dart';
 import 'package:stemflow/Widgets/backcircle.dart';
 
+import '../Services/forget_password_service.dart';
+
 class UpdatePasswordScreen extends StatefulWidget {
-  const UpdatePasswordScreen({super.key});
+  final String email;
+  final String otp;
+  final int userId;
+
+  const UpdatePasswordScreen({
+    super.key,
+    required this.email,
+    required this.otp,
+    required this.userId,
+  });
 
   @override
   State<UpdatePasswordScreen> createState() => _UpdatePasswordScreenState();
@@ -25,103 +37,85 @@ class _UpdatePasswordScreenState extends State<UpdatePasswordScreen> {
     super.dispose();
   }
 
+  void _showSnack(String message, {bool error = false}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          message,
+          style: const TextStyle(fontFamily: "Mynor"),
+        ),
+        backgroundColor: error ? Colors.red : const Color(0xFF287D80),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+      ),
+    );
+  }
+
   Future<void> _handleUpdate() async {
-    if (_passwordC.text.trim().isEmpty || _confirmC.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text(
-            'Please fill in all fields',
-            style: TextStyle(fontFamily: "Mynor"),
-          ),
-          backgroundColor: const Color(0xFF287D80),
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-        ),
-      );
+    final password = _passwordC.text.trim();
+    final confirmPassword = _confirmC.text.trim();
+
+    print("Change password button clicked");
+    print("Email: ${widget.email}");
+    print("OTP: ${widget.otp}");
+    print("User ID: ${widget.userId}");
+
+    if (password.isEmpty || confirmPassword.isEmpty) {
+      _showSnack("Please fill in all fields", error: true);
       return;
     }
 
-    if (_passwordC.text.trim().length < 6) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text(
-            'Password must be at least 6 characters',
-            style: TextStyle(fontFamily: "Mynor"),
-          ),
-          backgroundColor: const Color(0xFF287D80),
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-        ),
-      );
+    if (password.length < 8) {
+      _showSnack("Password must be at least 8 characters", error: true);
       return;
     }
 
-    if (_passwordC.text.trim() != _confirmC.text.trim()) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text(
-            'Passwords do not match',
-            style: TextStyle(fontFamily: "Mynor"),
-          ),
-          backgroundColor: Colors.red,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-        ),
-      );
+    if (password != confirmPassword) {
+      _showSnack("Passwords do not match", error: true);
       return;
     }
 
     setState(() => _isLoading = true);
 
     try {
-      // API call yahan add karein
-      await Future.delayed(const Duration(seconds: 1));
-
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text(
-            'Password updated successfully!',
-            style: TextStyle(fontFamily: "Mynor"),
-          ),
-          backgroundColor: const Color(0xFF287D80),
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-        ),
+      final result = await ForgetPasswordService.resetPassword(
+        email: widget.email,
+        otp: widget.otp,
+        newPassword: password,
+        confirmPassword: confirmPassword,
+        userId: widget.userId,
       );
 
-      // Next screen navigation yahan add karein
-      // Navigator.of(context).pushAndRemoveUntil(
-      //   MaterialPageRoute(builder: (context) => const LoginScreen()),
-      //   (route) => false,
-      // );
+      print("Reset password result: $result");
 
-    } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Failed: ${e.toString()}',
-            style: const TextStyle(fontFamily: "Mynor"),
-          ),
-          backgroundColor: Colors.red,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
+
+      _showSnack(
+        result["message"] ?? "Password has been changed successfully!",
+      );
+
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(
+          builder: (context) => const LoginScreen(),
         ),
+            (Route<dynamic> route) => false,
+      );
+    } catch (e) {
+      print("Reset password error: $e");
+
+      if (!mounted) return;
+
+      _showSnack(
+        e.toString().replaceAll("Exception: ", ""),
+        error: true,
       );
     } finally {
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -141,14 +135,10 @@ class _UpdatePasswordScreenState extends State<UpdatePasswordScreen> {
                 children: [
                   SizedBox(height: mq.height * 0.035),
 
-                  // Back button
                   Row(
                     children: [
-
                       BackCircle(onTap: () => Navigator.pop(context)),
-                      SizedBox(width: mq.width*0.03,),
-
-
+                      SizedBox(width: mq.width * 0.03),
                       const Text(
                         "Update Password",
                         style: TextStyle(
@@ -158,20 +148,17 @@ class _UpdatePasswordScreenState extends State<UpdatePasswordScreen> {
                           color: Colors.white,
                         ),
                       ),
-                      SizedBox(width: mq.width*0.1,),
-
-
+                      SizedBox(width: mq.width * 0.1),
                       Image.asset(
                         "assets/images/Logo.png",
                         height: 45,
                         width: 44,
-                      )
+                      ),
                     ],
                   ),
 
                   SizedBox(height: mq.height * 0.09),
 
-                  // Logo
                   Center(
                     child: Image.asset(
                       "assets/images/lock.png",
@@ -182,14 +169,16 @@ class _UpdatePasswordScreenState extends State<UpdatePasswordScreen> {
 
                   SizedBox(height: mq.height * 0.101),
 
-                  // Password field
                   _roundedField(
                     hint: "Enter New Password...",
                     controller: _passwordC,
                     obscureText: _obscurePassword,
                     suffix: IconButton(
-                      onPressed: () =>
-                          setState(() => _obscurePassword = !_obscurePassword),
+                      onPressed: _isLoading
+                          ? null
+                          : () => setState(
+                            () => _obscurePassword = !_obscurePassword,
+                      ),
                       icon: Icon(
                         _obscurePassword
                             ? Icons.visibility_off
@@ -202,14 +191,16 @@ class _UpdatePasswordScreenState extends State<UpdatePasswordScreen> {
 
                   const SizedBox(height: 8),
 
-                  // Confirm Password field
                   _roundedField(
                     hint: "Confirm New Password...",
                     controller: _confirmC,
                     obscureText: _obscureConfirm,
                     suffix: IconButton(
-                      onPressed: () =>
-                          setState(() => _obscureConfirm = !_obscureConfirm),
+                      onPressed: _isLoading
+                          ? null
+                          : () => setState(
+                            () => _obscureConfirm = !_obscureConfirm,
+                      ),
                       icon: Icon(
                         _obscureConfirm
                             ? Icons.visibility_off
@@ -222,15 +213,11 @@ class _UpdatePasswordScreenState extends State<UpdatePasswordScreen> {
 
                   SizedBox(height: mq.height * 0.042),
 
-                  // Update Button
                   SizedBox(
                     width: double.infinity,
                     height: 45,
                     child: ElevatedButton(
-                      onPressed: (){
-                        Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (context)=>LoginScreen(),
-                        ),(Route<dynamic>route)=>false);
-                      },
+                      onPressed: _isLoading ? null : _handleUpdate,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF287D80),
                         disabledBackgroundColor:
@@ -293,6 +280,7 @@ class _UpdatePasswordScreenState extends State<UpdatePasswordScreen> {
       child: Center(
         child: TextField(
           controller: controller,
+          enabled: !_isLoading,
           obscureText: obscureText,
           style: const TextStyle(
             color: Colors.white,

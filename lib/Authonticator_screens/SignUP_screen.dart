@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:stemflow/Authonticator_screens/Login_screen.dart';
 import 'package:stemflow/Privacy%20policy%20_screen.dart';
 import 'package:stemflow/Terms%20and%20condition%20_screen.dart';
+import 'package:stemflow/services/signup_service.dart';
+import 'package:stemflow/widgets/custom_toast.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
@@ -20,6 +22,7 @@ class _SignupScreenState extends State<SignupScreen> {
   bool agree = true;
   bool obscure1 = true;
   bool obscure2 = true;
+  bool isLoading = false;
 
   @override
   void dispose() {
@@ -28,6 +31,124 @@ class _SignupScreenState extends State<SignupScreen> {
     passC.dispose();
     confirmC.dispose();
     super.dispose();
+  }
+
+  Future<void> signupUser() async {
+    final username = userC.text.trim();
+    final email = emailC.text.trim();
+    final password = passC.text.trim();
+    final confirmPassword = confirmC.text.trim();
+
+    print("=== SIGNUP BUTTON CLICKED ===");
+    print("Username: $username");
+    print("Email: $email");
+    print("Password: $password");
+    print("Confirm Password: $confirmPassword");
+    print("Agree Terms: $agree");
+
+    if (username.isEmpty) {
+      CustomToast.show(
+        context: context,
+        message: "Please enter username",
+        type: ToastType.error,
+      );
+      return;
+    }
+
+    if (email.isEmpty) {
+      CustomToast.show(
+        context: context,
+        message: "Please enter email",
+        type: ToastType.error,
+      );
+      return;
+    }
+
+    if (!email.contains("@")) {
+      CustomToast.show(
+        context: context,
+        message: "Please enter valid email",
+        type: ToastType.error,
+      );
+      return;
+    }
+
+    if (password.isEmpty) {
+      CustomToast.show(
+        context: context,
+        message: "Please enter password",
+        type: ToastType.error,
+      );
+      return;
+    }
+
+    if (confirmPassword.isEmpty) {
+      CustomToast.show(
+        context: context,
+        message: "Please confirm password",
+        type: ToastType.error,
+      );
+      return;
+    }
+
+    if (password != confirmPassword) {
+      CustomToast.show(
+        context: context,
+        message: "Passwords do not match",
+        type: ToastType.error,
+      );
+      return;
+    }
+
+    if (!agree) {
+      CustomToast.show(
+        context: context,
+        message: "Please agree to Terms & Conditions",
+        type: ToastType.warning,
+      );
+      return;
+    }
+
+    setState(() {
+      isLoading = true;
+    });
+
+    final result = await SignupService.signup(
+      username: username,
+      email: email,
+      password: password,
+      passwordConfirmation: confirmPassword,
+    );
+
+    print("=== FINAL SIGNUP RESULT ===");
+    print(result.toString());
+
+    setState(() {
+      isLoading = false;
+    });
+
+    if (result["success"] == true) {
+      CustomToast.show(
+        context: context,
+        message: result["message"] ?? "Signup successful",
+        type: ToastType.success,
+      );
+
+      Future.delayed(const Duration(milliseconds: 800), () {
+        if (!mounted) return;
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (context) => LoginScreen()),
+              (Route<dynamic> route) => false,
+        );
+      });
+    } else {
+      CustomToast.show(
+        context: context,
+        message: result["message"] ?? "Signup failed",
+        type: ToastType.error,
+      );
+    }
   }
 
   @override
@@ -54,20 +175,20 @@ class _SignupScreenState extends State<SignupScreen> {
                 children: [
                   SizedBox(height: mq.height * 0.06),
 
-                  // Logo Circle
                   Center(
                     child: Container(
                       height: 155,
                       width: 160,
-                      decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          image: DecorationImage(image: AssetImage("assets/images/Logo.png"))
+                      decoration: const BoxDecoration(
+                        shape: BoxShape.circle,
+                        image: DecorationImage(
+                          image: AssetImage("assets/images/Logo.png"),
+                        ),
                       ),
                     ),
                   ),
                   SizedBox(height: mq.height * 0.04),
 
-                  // Title
                   const Text(
                     "Sign Up",
                     style: TextStyle(
@@ -80,7 +201,6 @@ class _SignupScreenState extends State<SignupScreen> {
 
                   const SizedBox(height: 6),
 
-                  // Subtitle
                   const Text(
                     "Enter Your Details to SignUp",
                     style: TextStyle(
@@ -93,7 +213,6 @@ class _SignupScreenState extends State<SignupScreen> {
 
                   SizedBox(height: mq.height * 0.025),
 
-                  // Username
                   _roundedField(
                     hint: "Username...",
                     controller: userC,
@@ -101,7 +220,6 @@ class _SignupScreenState extends State<SignupScreen> {
                   ),
                   const SizedBox(height: 5),
 
-                  // Email
                   _roundedField(
                     hint: "Email Address...",
                     controller: emailC,
@@ -109,7 +227,6 @@ class _SignupScreenState extends State<SignupScreen> {
                   ),
                   const SizedBox(height: 5),
 
-                  // Password
                   _roundedField(
                     hint: "Password....",
                     controller: passC,
@@ -125,7 +242,6 @@ class _SignupScreenState extends State<SignupScreen> {
                   ),
                   const SizedBox(height: 5),
 
-                  // Confirm Password
                   _roundedField(
                     hint: "Confirm Password...",
                     controller: confirmC,
@@ -142,7 +258,6 @@ class _SignupScreenState extends State<SignupScreen> {
 
                   const SizedBox(height: 14),
 
-                  // Agree line
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
@@ -164,8 +279,11 @@ class _SignupScreenState extends State<SignupScreen> {
                             ),
                           ),
                           child: agree
-                              ? const Icon(Icons.check,
-                              color: Colors.white, size: 13)
+                              ? const Icon(
+                            Icons.check,
+                            color: Colors.white,
+                            size: 13,
+                          )
                               : null,
                         ),
                       ),
@@ -178,7 +296,6 @@ class _SignupScreenState extends State<SignupScreen> {
                               fontSize: 11.5,
                               fontFamily: "Mynor",
                               fontWeight: FontWeight.w600,
-
                             ),
                             children: [
                               const TextSpan(text: "I agree with all "),
@@ -191,8 +308,13 @@ class _SignupScreenState extends State<SignupScreen> {
                                 ),
                                 recognizer: TapGestureRecognizer()
                                   ..onTap = () {
-                                  Navigator.push(context, MaterialPageRoute(builder: (context)=>TermsandconditionScreen()));
-
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) =>
+                                            TermsandconditionScreen(),
+                                      ),
+                                    );
                                   },
                               ),
                               const TextSpan(text: " and "),
@@ -205,7 +327,13 @@ class _SignupScreenState extends State<SignupScreen> {
                                 ),
                                 recognizer: TapGestureRecognizer()
                                   ..onTap = () {
-                                  Navigator.push(context, MaterialPageRoute(builder: (context)=>PrivacypolicyScreen()));
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) =>
+                                            PrivacypolicyScreen(),
+                                      ),
+                                    );
                                   },
                               ),
                             ],
@@ -217,14 +345,11 @@ class _SignupScreenState extends State<SignupScreen> {
 
                   SizedBox(height: mq.height * 0.028),
 
-                  // Sign Up button
                   SizedBox(
                     width: double.infinity,
                     height: 45,
                     child: ElevatedButton(
-                      onPressed: () {
-                        Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (context)=>LoginScreen()),
-                                (Route<dynamic>route)=>false);                      },
+                      onPressed: isLoading ? null : signupUser,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF287D80),
                         shape: RoundedRectangleBorder(
@@ -232,7 +357,16 @@ class _SignupScreenState extends State<SignupScreen> {
                         ),
                         elevation: 0,
                       ),
-                      child: const Text(
+                      child: isLoading
+                          ? const SizedBox(
+                        height: 22,
+                        width: 22,
+                        child: CircularProgressIndicator(
+                          color: Colors.white,
+                          strokeWidth: 2.5,
+                        ),
+                      )
+                          : const Text(
                         "Sign Up",
                         style: TextStyle(
                           fontSize: 15,
@@ -246,7 +380,6 @@ class _SignupScreenState extends State<SignupScreen> {
 
                   SizedBox(height: mq.height * 0.065),
 
-                  // Bottom text
                   Center(
                     child: RichText(
                       text: TextSpan(
@@ -264,8 +397,13 @@ class _SignupScreenState extends State<SignupScreen> {
                             alignment: PlaceholderAlignment.middle,
                             child: GestureDetector(
                               onTap: () {
-                                Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (context)=>LoginScreen()),
-                                    (Route<dynamic>route)=>false);
+                                Navigator.pushAndRemoveUntil(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => LoginScreen(),
+                                  ),
+                                      (Route<dynamic> route) => false,
+                                );
                               },
                               child: const Text(
                                 "Sign In",
@@ -314,7 +452,9 @@ class _SignupScreenState extends State<SignupScreen> {
           controller: controller,
           keyboardType: keyboardType,
           obscureText: obscureText,
-          style: const TextStyle(color: Colors.white, fontSize: 14,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 14,
             fontFamily: "Mynor",
           ),
           cursorColor: const Color(0xFF6FE6E4),

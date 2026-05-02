@@ -1,9 +1,13 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:stemflow/BottomNavigation_screen.dart';
+import 'package:stemflow/services/edit_profile_service.dart';
+import 'package:stemflow/widgets/custom_toast.dart';
 
+import 'MoreScreen.dart';
+import 'Services/session_manager.dart';
 import 'Widgets/backcircle.dart';
 import 'Widgets/background.dart';
 
@@ -16,25 +20,79 @@ class EditProfileScreen extends StatefulWidget {
 
 class _EditProfileScreenState extends State<EditProfileScreen> {
   final TextEditingController nameController = TextEditingController();
-  final TextEditingController emailController = TextEditingController();
 
   final ImagePicker _picker = ImagePicker();
+
   File? selectedImage;
+  String currentProfilePic = "";
+  String userId = "";
+  bool isLoading = true;
+  bool isUpdating = false;
+
+  @override
+  void initState() {
+    super.initState();
+    loadProfileData();
+  }
+
+  Future<void> loadProfileData() async {
+    try {
+      print("=== LOAD EDIT PROFILE DATA START ===");
+
+      final id = await SessionManager.instance.getUserId();
+      final username = await SessionManager.instance.getUsername();
+      final fullName = await SessionManager.instance.getFullName();
+      final profilePic = await SessionManager.instance.getProfilePic();
+
+      print("User ID: $id");
+      print("Username: $username");
+      print("Full Name: $fullName");
+      print("Profile Pic: $profilePic");
+
+      userId = id;
+      nameController.text = fullName.isNotEmpty
+          ? fullName
+          : (username.isNotEmpty ? username : "");
+      currentProfilePic = profilePic;
+
+      setState(() {
+        isLoading = false;
+      });
+
+      print("=== LOAD EDIT PROFILE DATA SUCCESS ===");
+      print("Final Name In Field: ${nameController.text}");
+    } catch (e) {
+      print("=== LOAD EDIT PROFILE DATA ERROR ===");
+      print("Error: $e");
+
+      setState(() {
+        isLoading = false;
+      });
+    }
+  }
 
   Future<void> pickImage(ImageSource source) async {
     try {
+      print("=== PICK IMAGE START ===");
+      print("Source: $source");
+
       final XFile? image = await _picker.pickImage(
         source: source,
         imageQuality: 85,
       );
 
       if (image != null && mounted) {
+        print("Picked Image Path: ${image.path}");
+
         setState(() {
           selectedImage = File(image.path);
         });
+      } else {
+        print("No image selected");
       }
     } catch (e) {
-      debugPrint("Image pick error: $e");
+      print("=== PICK IMAGE ERROR ===");
+      print("Error: $e");
     }
   }
 
@@ -44,10 +102,130 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     await pickImage(source);
   }
 
+  Future<String> convertImageToBase64(File imageFile) async {
+    try {
+      print("=== CONVERT IMAGE TO BASE64 START ===");
+      final bytes = await imageFile.readAsBytes();
+      final base64String = base64Encode(bytes);
+
+      String mimeType = "image/png";
+      final path = imageFile.path.toLowerCase();
+
+      if (path.endsWith(".jpg") || path.endsWith(".jpeg")) {
+        mimeType = "image/jpeg";
+      } else if (path.endsWith(".png")) {
+        mimeType = "image/png";
+      }
+
+      final result = "data:$mimeType;base64,$base64String";
+
+      print("=== CONVERT IMAGE TO BASE64 SUCCESS ===");
+      print("Base64 Length: ${result.length}");
+
+      return result;
+    } catch (e) {
+      print("=== CONVERT IMAGE TO BASE64 ERROR ===");
+      print("Error: $e");
+      rethrow;
+    }
+  }
+
+  Future<void> updateProfile() async {
+    final fullName = nameController.text.trim();
+
+    print("=== UPDATE PROFILE BUTTON CLICKED ===");
+    print("User ID: $userId");
+    print("Full Name: $fullName");
+    print("Selected Image: ${selectedImage?.path}");
+    print("Current Profile Pic: $currentProfilePic");
+
+    if (userId.isEmpty) {
+      CustomToast.show(
+        context: context,
+        message: "User session not found",
+        type: ToastType.error,
+      );
+      return;
+    }
+
+    if (fullName.isEmpty) {
+      CustomToast.show(
+        context: context,
+        message: "Please enter full name",
+        type: ToastType.error,
+      );
+      return;
+    }
+
+    String profilePicToSend = currentProfilePic;
+
+    if (selectedImage != null) {
+      profilePicToSend = await convertImageToBase64(selectedImage!);
+    }
+
+    if (profilePicToSend.isEmpty) {
+      CustomToast.show(
+        context: context,
+        message: "Please select profile image",
+        type: ToastType.error,
+      );
+      return;
+    }
+
+    setState(() {
+      isUpdating = true;
+    });
+
+    final result = await EditProfileService.updateProfile(
+      userId: userId,
+      fullName: fullName,
+      profilePicBase64: profilePicToSend,
+    );
+
+    print("=== FINAL EDIT PROFILE RESULT ===");
+    print(result.toString());
+
+    if (result["success"] == true) {
+      await SessionManager.instance.updateProfileSession(
+        fullName: fullName,
+        profilePic: profilePicToSend,
+      );
+
+      setState(() {
+        isUpdating = false;
+      });
+
+      CustomToast.show(
+        context: context,
+        message: result["message"] ?? "Profile updated successfully",
+        type: ToastType.success,
+      );
+
+      Future.delayed(const Duration(milliseconds: 700), () {
+        if (!mounted) return;
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (context) =>  Morescreen()),
+              (route) => false,
+        );
+      });
+    } else {
+      setState(() {
+        isUpdating = false;
+      });
+
+      CustomToast.show(
+        context: context,
+        message: result["message"] ?? "Profile update failed",
+        type: ToastType.error,
+      );
+    }
+  }
+
   void showImagePickerSheet(Size mq) {
     showModalBottomSheet(
       context: context,
-      backgroundColor: Colors.white,
+      backgroundColor: const Color(0xFF103E46),
       isScrollControlled: true,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(
@@ -68,7 +246,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   height: mq.height * 0.005,
                   width: mq.width * 0.15,
                   decoration: BoxDecoration(
-                    color: Colors.grey.shade300,
+                    color: Colors.white.withOpacity(0.22),
                     borderRadius: BorderRadius.circular(mq.width * 0.03),
                   ),
                 ),
@@ -77,8 +255,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   "Choose Profile Photo",
                   style: TextStyle(
                     fontSize: mq.width * 0.045,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.black87,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
                     fontFamily: "Mynor",
                   ),
                 ),
@@ -95,7 +273,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                             vertical: mq.height * 0.02,
                           ),
                           decoration: BoxDecoration(
-                            color: const Color(0xff2F8F94).withOpacity(0.12),
+                            color: const Color(0xff2F8F94).withOpacity(0.14),
                             borderRadius:
                             BorderRadius.circular(mq.width * 0.04),
                             border: Border.all(
@@ -116,7 +294,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                                 style: TextStyle(
                                   fontSize: mq.width * 0.04,
                                   fontWeight: FontWeight.w600,
-                                  color: const Color(0xff2F8F94),
+                                  color: Colors.white,
                                   fontFamily: "Mynor",
                                 ),
                               ),
@@ -136,7 +314,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                             vertical: mq.height * 0.02,
                           ),
                           decoration: BoxDecoration(
-                            color: const Color(0xff2F8F94).withOpacity(0.12),
+                            color: const Color(0xff2F8F94).withOpacity(0.14),
                             borderRadius:
                             BorderRadius.circular(mq.width * 0.04),
                             border: Border.all(
@@ -157,7 +335,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                                 style: TextStyle(
                                   fontSize: mq.width * 0.04,
                                   fontWeight: FontWeight.w600,
-                                  color: const Color(0xff2F8F94),
+                                  color: Colors.white,
                                   fontFamily: "Mynor",
                                 ),
                               ),
@@ -177,125 +355,19 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     );
   }
 
-  @override
-  void dispose() {
-    nameController.dispose();
-    emailController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final mq = MediaQuery
-        .of(context)
-        .size;
-
-    return Scaffold(
-      resizeToAvoidBottomInset: true,
-      body: Bg(
-        child: SafeArea(
-          child: SingleChildScrollView(
-            padding: EdgeInsets.symmetric(horizontal: mq.width * 0.07),
-            child: ConstrainedBox(
-              constraints: BoxConstraints(
-                minHeight: mq.height - MediaQuery
-                    .of(context)
-                    .padding
-                    .top,
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  SizedBox(height: mq.height * 0.035),
-
-                  Row(
-                    children: [
-                      BackCircle(
-                        onTap: () => Navigator.pop(context),
-                      ),
-                      const Spacer(),
-                      Container(
-                        height: 44,
-                        width: 45,
-                        decoration: const BoxDecoration(
-                          image: DecorationImage(
-                            image: AssetImage("assets/images/Logo.png"),
-                            fit: BoxFit.contain,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-
-                  SizedBox(height: mq.height * 0.08),
-
-                  Center(
-                    child: buildProfileImagePicker(mq),
-                  ),
-
-                  SizedBox(height: mq.height * 0.06),
-
-                  buildTextField(
-                    mq: mq,
-                    controller: nameController,
-                    hintText: "Rehan R",
-                  ),
-
-                  SizedBox(height: mq.height * 0.015),
-
-                  buildTextField(
-                    mq: mq,
-                    controller: emailController,
-                    hintText: "Example@mail.com",
-                  ),
-
-                  SizedBox(height: mq.height * 0.035),
-
-                  GestureDetector(
-                    onTap: () {
-                      Navigator.push(context, MaterialPageRoute(builder: (context)=>WidgetTree()));
-                    },
-                    child: Container(
-                      height: 45,
-                      width: double.infinity,
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        color: const Color(0xff287D80),
-                        borderRadius: BorderRadius.circular(mq.width * 0.08),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.08),
-                            blurRadius: mq.width * 0.02,
-                            offset: Offset(0, mq.height * 0.004),
-                          ),
-                        ],
-                      ),
-                      child: Text(
-                        "Update",
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: mq.width * 0.039,
-                          fontWeight: FontWeight.w700,
-                          fontFamily: "Mynor",
-                        ),
-                      ),
-                    ),
-                  ),
-
-                  SizedBox(height: mq.height * 0.03),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
   Widget buildProfileImagePicker(Size mq) {
+    ImageProvider? imageProvider;
+
+    if (selectedImage != null) {
+      imageProvider = FileImage(selectedImage!);
+    } else if (currentProfilePic.isNotEmpty &&
+        currentProfilePic.startsWith("http")) {
+      imageProvider = NetworkImage(currentProfilePic);
+    }
+
     return Stack(
       alignment: Alignment.center,
       children: [
-        // Profile Image Circle
         Container(
           height: mq.width * 0.32,
           width: mq.width * 0.32,
@@ -309,14 +381,14 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
-            image: selectedImage != null
+            image: imageProvider != null
                 ? DecorationImage(
-              image: FileImage(selectedImage!),
+              image: imageProvider,
               fit: BoxFit.cover,
             )
                 : null,
           ),
-          child: selectedImage == null
+          child: imageProvider == null
               ? Center(
             child: Icon(
               Icons.person,
@@ -326,8 +398,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           )
               : null,
         ),
-
-        // Camera Icon (Bottom Right)
         Positioned(
           bottom: 4,
           right: 4,
@@ -375,7 +445,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       alignment: Alignment.center,
       child: TextField(
         controller: controller,
-        style: TextStyle(
+        style: const TextStyle(
           color: Colors.white,
           fontSize: 12,
           fontWeight: FontWeight.w500,
@@ -393,6 +463,114 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           border: InputBorder.none,
           contentPadding: EdgeInsets.symmetric(
             horizontal: mq.width * 0.05,
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    nameController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final mq = MediaQuery.of(context).size;
+
+    return Scaffold(
+      resizeToAvoidBottomInset: true,
+      body: Bg(
+        child: SafeArea(
+          child: isLoading
+              ? const Center(
+            child: CircularProgressIndicator(
+              color: Color(0xff287D80),
+            ),
+          )
+              : SingleChildScrollView(
+            padding: EdgeInsets.symmetric(horizontal: mq.width * 0.07),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                minHeight:
+                mq.height - MediaQuery.of(context).padding.top,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SizedBox(height: mq.height * 0.035),
+                  Row(
+                    children: [
+                      BackCircle(
+                        onTap: () => Navigator.pop(context),
+                      ),
+                      const Spacer(),
+                      Container(
+                        height: 44,
+                        width: 45,
+                        decoration: const BoxDecoration(
+                          image: DecorationImage(
+                            image: AssetImage("assets/images/Logo.png"),
+                            fit: BoxFit.contain,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: mq.height * 0.08),
+                  Center(
+                    child: buildProfileImagePicker(mq),
+                  ),
+                  SizedBox(height: mq.height * 0.06),
+                  buildTextField(
+                    mq: mq,
+                    controller: nameController,
+                    hintText: "Enter full name",
+                  ),
+                  SizedBox(height: mq.height * 0.035),
+                  GestureDetector(
+                    onTap: isUpdating ? null : updateProfile,
+                    child: Container(
+                      height: 45,
+                      width: double.infinity,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: const Color(0xff287D80),
+                        borderRadius:
+                        BorderRadius.circular(mq.width * 0.08),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.08),
+                            blurRadius: mq.width * 0.02,
+                            offset: Offset(0, mq.height * 0.004),
+                          ),
+                        ],
+                      ),
+                      child: isUpdating
+                          ? const SizedBox(
+                        height: 22,
+                        width: 22,
+                        child: CircularProgressIndicator(
+                          color: Colors.white,
+                          strokeWidth: 2.5,
+                        ),
+                      )
+                          : Text(
+                        "Update",
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: mq.width * 0.039,
+                          fontWeight: FontWeight.w700,
+                          fontFamily: "Mynor",
+                        ),
+                      ),
+                    ),
+                  ),
+                  SizedBox(height: mq.height * 0.03),
+                ],
+              ),
+            ),
           ),
         ),
       ),

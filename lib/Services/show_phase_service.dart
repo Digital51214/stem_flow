@@ -1,34 +1,43 @@
-import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:http/http.dart' as http;
+import '../models/phase_model.dart';
 
-class ProjectService {
-  static Future<Map<String, dynamic>> getProjectPhases({
+class ShowPhaseService {
+  static const String _baseUrl = 'https://backend.stem-flow.com/api';
+
+  static Future<List<PhaseModel>> getProjectPhases({
     required int userId,
     required int projectId,
     required String apiKey,
   }) async {
-    final url = Uri.parse('https://backend.stem-flow.com/api/phases/get-by-project');
+    final uri = Uri.parse('$_baseUrl/phases/get-by-project');
+
     final response = await http.post(
-      url,
+      uri,
       headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
         'Authorization': 'Bearer $apiKey',
       },
-      body: json.encode({
+      body: jsonEncode({
         'user_id': userId,
         'project_id': projectId,
       }),
     );
 
     if (response.statusCode == 200) {
-      final result = json.decode(response.body);
-      // Here, you can set the body or result
-      if (result['success']) {
-        return result; // You can extract the relevant phase data here if needed
+      final Map<String, dynamic> body = jsonDecode(response.body);
+
+      if (body['success'] == true) {
+        final List<dynamic> data = body['data'] as List<dynamic>;
+        return data
+            .map((e) => PhaseModel.fromJson(e as Map<String, dynamic>))
+            .toList();
       } else {
-        throw Exception('Failed to retrieve phases: ${result['message']}');
+        throw Exception(body['message'] ?? 'Failed to fetch phases');
       }
     } else {
-      throw Exception('Failed to load phases');
+      throw Exception('Server error: ${response.statusCode}');
     }
   }
 }

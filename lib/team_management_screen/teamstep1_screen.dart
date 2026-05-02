@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:stemflow/BottomNavigation_screen.dart';
 import 'package:stemflow/Widgets/BigButton.dart';
 import 'package:stemflow/Widgets/PillSmall.dart';
 import 'package:stemflow/Widgets/backcircle.dart';
@@ -6,6 +7,8 @@ import 'package:stemflow/Widgets/background.dart';
 import 'package:stemflow/Widgets/progless_line.dart';
 import 'package:stemflow/team_management_screen/createteam_screen.dart';
 import 'package:stemflow/team_management_screen/jointeam_screen.dart';
+
+import '../Widgets/CustomBottomNavBar.dart';
 
 class TeamStep1Screen extends StatefulWidget {
   const TeamStep1Screen({super.key});
@@ -127,9 +130,42 @@ class _TeamStep1ScreenState extends State<TeamStep1Screen> {
                     }
                   },
                 ),
+                const SizedBox(height: 30),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Text("Already have a team. ",
+                      style: TextStyle(
+                        color: Color(0xFF287D80),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w400,
+                        fontFamily: "Mynor",
+                      ),
+                      ),
 
+                GestureDetector(
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => WidgetTree(),
+                      ),
+                    );
+                  },
+                  child: const Text("Skip this step -->",
+                    style: TextStyle(
+                   decoration: TextDecoration.underline,
+                      decorationColor: Colors.black,
+                      decorationThickness: 2,
+                      color: Colors.black,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      fontFamily: "Mynor",
+                    ),),
+                ), ],
+                ),
                 const Spacer(),
-                const SizedBox(height: 10),
+
               ],
             ),
           ),

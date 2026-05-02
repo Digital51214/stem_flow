@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:stemflow/Widgets/Background2.dart';
 import 'package:stemflow/Widgets/backcircle.dart';
 import 'package:stemflow/Widgets/background.dart';
 class TermsandconditionScreen extends StatelessWidget {
@@ -9,7 +8,11 @@ class TermsandconditionScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final mqsize =MediaQuery.of(context).size;
     return Scaffold(
-      body: Bg2(child: SafeArea(child: SingleChildScrollView(
+      body:Stack(fit: StackFit.expand,
+          children:[
+            Image.asset("assets/images/bg2.png",
+              fit: BoxFit.cover,),
+            SafeArea(child: SingleChildScrollView(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 18.0),
           child: Column(
@@ -69,7 +72,7 @@ class TermsandconditionScreen extends StatelessWidget {
             ],
           ),
         ),
-      ))),
+      ))]),
     );
   }
 }
