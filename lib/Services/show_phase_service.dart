@@ -8,7 +8,6 @@ class ShowPhaseService {
   static Future<List<PhaseModel>> getProjectPhases({
     required int userId,
     required int projectId,
-    required String apiKey,
   }) async {
     final uri = Uri.parse('$_baseUrl/phases/get-by-project');
 
@@ -17,13 +16,15 @@ class ShowPhaseService {
       headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
-        'Authorization': 'Bearer $apiKey',
       },
       body: jsonEncode({
         'user_id': userId,
         'project_id': projectId,
       }),
     );
+
+    print('[ShowPhaseService] Status: ${response.statusCode}');
+    print('[ShowPhaseService] Body: ${response.body}');
 
     if (response.statusCode == 200) {
       final Map<String, dynamic> body = jsonDecode(response.body);
@@ -34,10 +35,12 @@ class ShowPhaseService {
             .map((e) => PhaseModel.fromJson(e as Map<String, dynamic>))
             .toList();
       } else {
-        throw Exception(body['message'] ?? 'Failed to fetch phases');
+        throw Exception('Error: ${body['message'] ?? 'Failed to fetch phases'}');
       }
     } else {
-      throw Exception('Server error: ${response.statusCode}');
+      throw Exception(
+        'Server error: ${response.statusCode}. Response: ${response.body}',
+      );
     }
   }
 }

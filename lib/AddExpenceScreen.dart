@@ -1,11 +1,11 @@
+import 'dart:convert';
 import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'package:stemflow/BottomNavigation_screen.dart';
 import 'package:stemflow/Widgets/backcircle.dart';
 import 'package:stemflow/Widgets/background.dart';
+import 'package:stemflow/services/add_expense_service.dart';
 
-import 'Services/add_expense_service.dart';
-
+import 'BottomNavigation_screen.dart';
 
 class AddExpenseScreen extends StatefulWidget {
   const AddExpenseScreen({super.key});
@@ -57,7 +57,7 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-           content: Text("Saved! Expense"),
+          content: Text("Saved! Expense"),
           backgroundColor: Color(0xFF287D80),
         ),
       );

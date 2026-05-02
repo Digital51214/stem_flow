@@ -4,10 +4,12 @@ import 'package:stemflow/BudgetScreen.dart';
 import 'package:stemflow/NotificationScreen.dart';
 import 'package:stemflow/Widgets/background.dart';
 import 'package:stemflow/team_management_screen/your_team_list.dart';
+import 'Services/session_manager.dart';
 import 'Services/show_project_list.dart';
 import 'Services/show_phase_service.dart';
 import 'models/project_model.dart';
 import 'models/phase_model.dart';
+
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -26,20 +28,30 @@ class _HomeScreenState extends State<HomeScreen> {
   List<PhaseModel> _phases = [];
   PhaseModel? _selectedPhase;
 
-  final int _userId = 1;
+  late int _userId;  // User ID dynamically fetched from session
   final String _apiKey = "YOUR_API_KEY_HERE";
 
   @override
   void initState() {
     super.initState();
-    _fetchProjects();
+    _loadUserData();
   }
 
+  // Fetch logged-in userId from session manager
+  Future<void> _loadUserData() async {
+    final userId = await SessionManager.instance.getUserId();  // Fetch user ID from session manager
+    setState(() {
+      _userId = int.parse(userId);  // Assign the fetched user ID to _userId
+    });
+    _fetchProjects();  // Once user ID is set, fetch the projects
+  }
+
+  // Fetch projects based on the logged-in user ID
   Future<void> _fetchProjects() async {
     setState(() => _isLoadingProjects = true);
     try {
       final result = await ShowProjectService.getUserProjects(
-        userId: _userId,
+        userId: _userId,  // Use the dynamically fetched user_id
         apiKey: _apiKey,
       );
       if (!mounted) return;
@@ -61,6 +73,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  // Fetch phases based on selected project ID
   Future<void> _fetchPhases(int projectId) async {
     setState(() {
       _isLoadingPhases = true;
@@ -69,14 +82,13 @@ class _HomeScreenState extends State<HomeScreen> {
     });
     try {
       final result = await ShowPhaseService.getProjectPhases(
-        userId: _userId,
+        userId: _userId,  // Use the dynamically fetched user_id
         projectId: projectId,
-        apiKey: _apiKey,
+
       );
       if (!mounted) return;
       setState(() {
         _phases = result;
-        // Default: first active phase, fallback to first
         _selectedPhase = result.firstWhere(
               (p) => p.isActive,
           orElse: () => result.isNotEmpty ? result.first : _selectedPhase!,
@@ -181,8 +193,6 @@ class _HomeScreenState extends State<HomeScreen> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-
-                              // Header: label + active badge
                               Row(
                                 children: [
                                   const Expanded(
@@ -197,12 +207,10 @@ class _HomeScreenState extends State<HomeScreen> {
                                     ),
                                   ),
                                   Container(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 12, vertical: 5),
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
                                     decoration: BoxDecoration(
                                       border: Border.all(
-                                          color: Colors.white.withOpacity(0.75),
-                                          width: 1),
+                                          color: Colors.white.withOpacity(0.75), width: 1),
                                       borderRadius: BorderRadius.circular(18),
                                     ),
                                     child: Text(
@@ -219,10 +227,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                   ),
                                 ],
                               ),
-
                               const SizedBox(height: 4),
-
-                              // ── Project Dropdown ──
                               if (_isLoadingProjects)
                                 _buildInlineLoader("Loading projects...")
                               else if (_projects.isEmpty)
@@ -280,10 +285,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                     },
                                   ),
                                 ),
-
                               const SizedBox(height: 6),
-
-                              // ── Phase Dropdown ──
                               if (_isLoadingPhases)
                                 _buildInlineLoader("Loading phases...")
                               else if (_phases.isEmpty)
@@ -316,7 +318,6 @@ class _HomeScreenState extends State<HomeScreen> {
                                       color: Colors.white70,
                                       size: 20,
                                     ),
-                                    // What shows when dropdown is closed
                                     selectedItemBuilder: (_) => _phases
                                         .map((ph) => Row(
                                       children: [
@@ -344,7 +345,6 @@ class _HomeScreenState extends State<HomeScreen> {
                                       ],
                                     ))
                                         .toList(),
-                                    // What shows in the open dropdown list
                                     items: _phases
                                         .map((ph) => DropdownMenuItem<PhaseModel>(
                                       value: ph,
@@ -396,11 +396,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                     },
                                   ),
                                 ),
-
                               const SizedBox(height: 20),
-
-
-                              // ── Progress Row ──
                               Row(
                                 children: [
                                   Expanded(
@@ -445,10 +441,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                         ),
                       ),
-
                       const SizedBox(height: 10),
-
-                      // ── 3 Stats Cards ──
                       Row(
                         children: [
                           Expanded(
@@ -478,10 +471,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                         ],
                       ),
-
                       const SizedBox(height: 12),
-
-                      // ── Budget Overview Card ──
                       GestureDetector(
                         onTap: () => Navigator.push(
                             context,
@@ -605,10 +595,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                         ),
                       ),
-
                       SizedBox(height: mq.height * 0.015),
-
-                      // ── Your Team Button ──
                       GestureDetector(
                         onTap: () => Navigator.push(
                             context,
@@ -645,7 +632,6 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                         ),
                       ),
-
                       SizedBox(height: mq.height * 0.05),
                     ],
                   ),

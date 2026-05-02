@@ -1,8 +1,14 @@
 import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:stemflow/Widgets/BigButton.dart';
+import 'package:stemflow/Widgets/backcircle.dart';
 import 'package:stemflow/Widgets/background.dart';
-
+import 'package:stemflow/Widgets/progless_line.dart';
+import 'package:stemflow/Widgets/roundedfield.dart';
+import 'package:stemflow/services/join_team_service.dart';
+import 'package:stemflow/Services/session_manager.dart';
 import '../AddMemberScreen.dart';
 import '../Services/team_list_service.dart';
 import '../TeamconfigrationScreen.dart';
@@ -21,9 +27,6 @@ class _YourTeamsScreenState extends State<YourTeamsScreen> {
   bool isLoading = false;
   List<MyTeamModel> teams = [];
 
-  final int userId = 1;
-  final String apiKey = "YOUR_API_KEY_HERE";
-
   @override
   void initState() {
     super.initState();
@@ -34,9 +37,12 @@ class _YourTeamsScreenState extends State<YourTeamsScreen> {
     setState(() => isLoading = true);
 
     try {
+      final userIdText = await SessionManager.instance.getUserId();
+      final userId = int.tryParse(userIdText) ?? 0;
+
       final result = await MyTeamService.getMyTeams(
         userId: userId,
-        apiKey: apiKey,
+        apiKey: "YOUR_API_KEY_HERE",
       );
       if (!mounted) return;
       setState(() => teams = result);
@@ -159,14 +165,13 @@ class _YourTeamsScreenState extends State<YourTeamsScreen> {
                       itemBuilder: (context, index) {
                         return GestureDetector(
                           onTap: () {
-                            // ← Yahan team.id pass ho raha hai
+                            // Pass team.id to navigate
                             Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder: (_) =>
-                                    TeamConfigurationScreen(
-                                      teamId: teams[index].id,
-                                    ),
+                                builder: (_) => TeamConfigurationScreen(
+                                  teamId: teams[index].id,
+                                ),
                               ),
                             );
                           },
@@ -177,8 +182,7 @@ class _YourTeamsScreenState extends State<YourTeamsScreen> {
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
-                                  builder: (_) =>
-                                  const AddMemberScreen1(),
+                                  builder: (_) => const AddMemberScreen1(),
                                 ),
                               );
                             },
@@ -261,6 +265,40 @@ class _YourTeamsScreenState extends State<YourTeamsScreen> {
     );
   }
 }
+
+
+  Widget plusSmall(VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        height: 22,
+        width: 22,
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          shape: BoxShape.circle,
+        ),
+        child: const Icon(Icons.add, size: 16, color: Color(0xFF555555)),
+      ),
+    );
+  }
+
+  Widget memberAvatar(String image) {
+    return CircleAvatar(
+      radius: 13,
+      backgroundColor: Colors.white,
+      child: CircleAvatar(
+        radius: 12,
+        backgroundImage: AssetImage(image),
+      ),
+    );
+  }
+
+  Widget overlapAvatar(String image) {
+    return Transform.translate(
+      offset: const Offset(-8, 0),
+      child: memberAvatar(image),
+    );
+  }
 
 // ─── TeamCard (same as before) ───────────────────────────────────────────────
 

@@ -1,11 +1,12 @@
 import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:stemflow/CreateTaskScreen.dart';
 import 'package:stemflow/Widgets/background.dart';
-
 import 'Services/get_task_service.dart';
 import 'Services/team_list_service.dart';
 import 'models/teams_models.dart';
+import 'package:stemflow/Services/session_manager.dart';  // Added import for SessionManager
 
 class TaskScreen extends StatefulWidget {
   const TaskScreen({super.key});
@@ -24,9 +25,6 @@ class _TaskScreenState extends State<TaskScreen> {
   bool _isLoadingTasks = false;
   List<TaskModel> _tasks = [];
 
-  final int _userId = 1;
-  final String _apiKey = "YOUR_API_KEY_HERE";
-
   @override
   void initState() {
     super.initState();
@@ -37,9 +35,12 @@ class _TaskScreenState extends State<TaskScreen> {
   Future<void> _fetchTeams() async {
     setState(() => _isLoadingTeams = true);
     try {
+      final userIdText = await SessionManager.instance.getUserId();
+      final userId = int.tryParse(userIdText) ?? 0;
+
       final result = await MyTeamService.getMyTeams(
-        userId: _userId,
-        apiKey: _apiKey,
+        userId: userId,  // Now using dynamic userId
+        apiKey: "YOUR_API_KEY_HERE",
       );
       if (!mounted) return;
       setState(() {
@@ -373,6 +374,57 @@ class _TaskScreenState extends State<TaskScreen> {
     );
   }
 }
+
+// ─── Team Dropdown ────────────────────────────────────────────────────────────
+
+
+
+  Widget _buildLoader(Size mq) {
+    return SizedBox(
+      height: mq.height * 0.2,
+      child: const Center(
+        child: CircularProgressIndicator(
+          color: Color(0xFF287D80),
+          strokeWidth: 2.5,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSelectTeamState(Size mq) {
+    return SizedBox(
+      height: mq.height * 0.2,
+      child: Center(
+        child: Text(
+          "Select a team to view tasks",
+          style: TextStyle(
+            color: Colors.white70,
+            fontSize: mq.width * 0.038,
+            fontFamily: "Mynor",
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyState(Size mq) {
+    return SizedBox(
+      height: mq.height * 0.2,
+      child: Center(
+        child: Text(
+          "No tasks found",
+          style: TextStyle(
+            color: Colors.white70,
+            fontSize: mq.width * 0.038,
+            fontFamily: "Mynor",
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+    );
+  }
+
 
 // ─── Team Dropdown ────────────────────────────────────────────────────────────
 

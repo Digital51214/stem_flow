@@ -4,6 +4,7 @@ import 'package:stemflow/Widgets/background.dart';
 import '../models/project_model.dart';
 import '../Services/show_project_list.dart';
 import 'create_project_screen.dart';
+import 'package:stemflow/Services/session_manager.dart';
 
 class ProjectListScreen extends StatefulWidget {
   const ProjectListScreen({super.key});
@@ -15,9 +16,6 @@ class ProjectListScreen extends StatefulWidget {
 class _ProjectListScreenState extends State<ProjectListScreen> {
   bool isLoading = false;
   List<ProjectModel> projects = [];
-
-  final int userId = 1;
-  final String apiKey = 'YOUR_API_KEY_HERE';
 
   @override
   void initState() {
@@ -49,11 +47,14 @@ class _ProjectListScreenState extends State<ProjectListScreen> {
     });
 
     try {
+      final userIdText = await SessionManager.instance.getUserId();
+      final userId = int.tryParse(userIdText) ?? 0;
+
       print('Fetching projects...');
 
       final result = await ShowProjectService.getUserProjects(
         userId: userId,
-        apiKey: apiKey,
+        apiKey: "YOUR_API_KEY_HERE",
       );
 
       print('Projects loaded successfully');

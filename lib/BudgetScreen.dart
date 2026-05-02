@@ -1,9 +1,15 @@
+import 'dart:convert';
 import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'package:stemflow/AddExpenceScreen.dart';
 import 'package:stemflow/Widgets/backcircle.dart';
 import 'package:stemflow/Widgets/background.dart';
 import 'package:stemflow/services/budget_service.dart';
+
+import 'package:stemflow/models/project_model.dart';
+import 'package:stemflow/services/session_manager.dart';
+
+import 'AddExpenceScreen.dart';
+import 'Services/show_project_list.dart'; // Ensure this is imported
 
 class BudgetScreen extends StatefulWidget {
   const BudgetScreen({super.key});
@@ -15,27 +21,55 @@ class BudgetScreen extends StatefulWidget {
 class _BudgetScreenState extends State<BudgetScreen> {
   bool isLoading = false;
   List expenseLog = [];
+  List<ProjectModel> _projects = [];  // List to store projects
+  ProjectModel? _selectedProject;  // The selected project
 
   @override
   void initState() {
     super.initState();
-    fetchBudgetDetails();
+    fetchProjects();  // Fetch all projects
   }
 
-  Future<void> fetchBudgetDetails() async {
+  Future<void> fetchProjects() async {
     setState(() => isLoading = true);
 
     try {
-      final result = await BudgetService.getBudgetDetails(teamId: 2);
+      final userId = await SessionManager.instance.getUserId();
+      final result = await ShowProjectService.getUserProjects(
+        userId: int.parse(userId),  // Convert userId to int here if it's a String
+        apiKey: 'YOUR_API_KEY',
+      );
 
-      print("✅ BUDGET API SUCCESS");
-      print("✅ FULL RESULT: $result");
+      setState(() {
+        _projects = result;  // Store projects
+        if (_projects.isNotEmpty) {
+          _selectedProject = _projects.first;  // Automatically select the first project
+        }
+      });
+
+      // Fetch the budget details for the selected project
+      if (_selectedProject != null) {
+        await fetchBudgetDetails(_selectedProject!.id);
+      }
+    } catch (e) {
+      print("❌ PROJECT API ERROR: $e");
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to load projects')),
+      );
+    }
+
+    setState(() => isLoading = false);
+  }
+
+  Future<void> fetchBudgetDetails(int projectId) async {
+    setState(() => isLoading = true);
+
+    try {
+      final result = await BudgetService.getBudgetDetails(teamId: 2);  // Modify this if needed
 
       setState(() {
         expenseLog = result["expense_log"] ?? [];
       });
-
-      print("✅ EXPENSE LOG LENGTH: ${expenseLog.length}");
     } catch (e) {
       print("❌ BUDGET API ERROR: $e");
 
@@ -48,6 +82,17 @@ class _BudgetScreenState extends State<BudgetScreen> {
     }
 
     setState(() => isLoading = false);
+  }
+
+  double getTotalSpend() {
+    double total = 0;
+
+    for (final item in expenseLog) {
+      final amountText = item["amount"].toString().replaceAll("\$", "").replaceAll(",", "");
+      total += double.tryParse(amountText) ?? 0;
+    }
+
+    return total;
   }
 
   IconData getExpenseIcon(String category) {
@@ -63,17 +108,6 @@ class _BudgetScreenState extends State<BudgetScreen> {
       default:
         return Icons.receipt_long_outlined;
     }
-  }
-
-  double getTotalSpend() {
-    double total = 0;
-
-    for (final item in expenseLog) {
-      final amountText = item["amount"].toString().replaceAll("\$", "").replaceAll(",", "");
-      total += double.tryParse(amountText) ?? 0;
-    }
-
-    return total;
   }
 
   @override
@@ -99,25 +133,22 @@ class _BudgetScreenState extends State<BudgetScreen> {
                 ),
               ),
             ),
-
             SafeArea(
               child: RefreshIndicator(
-                onRefresh: fetchBudgetDetails,
+                onRefresh: () async {
+                  if (_selectedProject != null) {
+                    await fetchBudgetDetails(_selectedProject!.id);
+                  }
+                },
                 child: SingleChildScrollView(
-                  physics: const AlwaysScrollableScrollPhysics(),
                   padding: EdgeInsets.symmetric(horizontal: mq.width * 0.055),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       SizedBox(height: mq.height * 0.045),
-
                       Row(
                         children: [
-                          BackCircle(
-                            onTap: () {
-                              Navigator.pop(context);
-                            },
-                          ),
+                          BackCircle(onTap: () => Navigator.pop(context)),
                           const Spacer(),
                           Container(
                             height: mq.height * 0.06,
@@ -143,6 +174,30 @@ class _BudgetScreenState extends State<BudgetScreen> {
                           fontWeight: FontWeight.w900,
                         ),
                       ),
+
+                      SizedBox(height: mq.height * 0.02),
+
+                      // Project Dropdown
+                      if (_projects.isNotEmpty)
+                        DropdownButton<ProjectModel>(
+                          value: _selectedProject,
+                          hint: Text("Select Project"),
+                          items: _projects.map((project) {
+                            return DropdownMenuItem<ProjectModel>(
+                              value: project,
+                              child: Text(project.projectName),
+                            );
+                          }).toList(),
+                          onChanged: (ProjectModel? selectedProject) {
+                            setState(() {
+                              _selectedProject = selectedProject;
+                              // Fetch budget details for the selected project
+                              if (_selectedProject != null) {
+                                fetchBudgetDetails(_selectedProject!.id);
+                              }
+                            });
+                          },
+                        ),
 
                       SizedBox(height: mq.height * 0.02),
 
@@ -190,7 +245,6 @@ class _BudgetScreenState extends State<BudgetScreen> {
                         },
                         itemBuilder: (context, index) {
                           final expense = expenseLog[index];
-
                           return _ExpenseCard(
                             mq: mq,
                             icon: getExpenseIcon(expense["category"] ?? ""),
@@ -214,7 +268,9 @@ class _BudgetScreenState extends State<BudgetScreen> {
                             ),
                           );
 
-                          fetchBudgetDetails();
+                          if (_selectedProject != null) {
+                            fetchBudgetDetails(_selectedProject!.id);
+                          }
                         },
                       ),
 
@@ -241,6 +297,7 @@ class _BudgetScreenState extends State<BudgetScreen> {
   }
 }
 
+// -------------------- Total Spend Card Widget -----------------------
 class _TotalSpendCard extends StatelessWidget {
   final Size mq;
   final String totalSpend;
@@ -325,6 +382,7 @@ class _TotalSpendCard extends StatelessWidget {
   }
 }
 
+// -------------------- Expense Card Widget -----------------------
 class _ExpenseCard extends StatelessWidget {
   final Size mq;
   final IconData icon;
@@ -433,6 +491,7 @@ class _ExpenseCard extends StatelessWidget {
   }
 }
 
+// -------------------- Add Expense Button Widget -----------------------
 class _AddExpenseButton extends StatelessWidget {
   final Size mq;
   final VoidCallback onTap;
@@ -486,6 +545,7 @@ class _AddExpenseButton extends StatelessWidget {
   }
 }
 
+// -------------------- Glass Card Widget -----------------------
 class _GlassCard extends StatelessWidget {
   final Size mq;
   final double height;

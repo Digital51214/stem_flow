@@ -1,14 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:stemflow/BottomNavigation_screen.dart';
-import 'package:stemflow/Services/team_service.dart';
-import 'package:stemflow/Widgets/BigButton.dart';
 import 'package:stemflow/Widgets/IconPickerDialog.dart';
-import 'package:stemflow/Widgets/backcircle.dart';
-import 'package:stemflow/Widgets/background.dart';
-import 'package:stemflow/Widgets/dropdownfield.dart';
-import 'package:stemflow/Widgets/progless_line.dart';
-import 'package:stemflow/Widgets/roundedfield.dart';
-import 'package:stemflow/Widgets/uploadfield.dart';
+import '../Widgets/background.dart';
+import '../services/team_service.dart';
+import 'package:stemflow/Services/session_manager.dart';
 
 class CreateTeamScreen extends StatefulWidget {
   const CreateTeamScreen({super.key});
@@ -19,102 +14,59 @@ class CreateTeamScreen extends StatefulWidget {
 
 class _CreateTeamScreenState extends State<CreateTeamScreen> {
   final TextEditingController teamNameC = TextEditingController();
-  final TextEditingController descC = TextEditingController();
+  final TextEditingController yearC = TextEditingController();
+  final TextEditingController descriptionC = TextEditingController();
 
-  String sessionYear = "2024 / 2025";
   IconData? selectedIcon;
 
   bool isLoading = false;
 
-  // Apne BigButton wala exact color yahan set kar dena
-  final Color buttonColor = const Color(0xFF287D80);
-
-  @override
-  void dispose() {
-    teamNameC.dispose();
-    descC.dispose();
-    super.dispose();
-  }
-
-  void showToastMessage(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          message,
-          style: const TextStyle(
-            color: Colors.white,
-            fontFamily: "Mynor",
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        backgroundColor: buttonColor,
-        behavior: SnackBarBehavior.floating,
-        margin: const EdgeInsets.all(16),
-        duration: const Duration(seconds: 2),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(14),
-        ),
-      ),
-    );
-  }
-
-  Future<void> createTeamApi() async {
-    if (isLoading) return;
-
+  Future<void> createTeam() async {
     if (teamNameC.text.trim().isEmpty) {
-      showToastMessage("Please enter team name");
-      return;
-    }
-
-    if (descC.text.trim().isEmpty) {
-      showToastMessage("Please enter description");
-      return;
-    }
-
-    if (selectedIcon == null) {
-      showToastMessage("Please select team icon");
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Team name required")),
+      );
       return;
     }
 
     setState(() => isLoading = true);
-    print("Create Team Loader Started");
 
-    final result = await TeamService.createTeam(
-      userId: 1,
-      teamName: teamNameC.text.trim(),
-      year: sessionYear,
-      description: descC.text.trim(),
+    try {
+      final userIdText = await SessionManager.instance.getUserId();
+      final userId = int.tryParse(userIdText) ?? 0;
 
-      // Temporary IconData value
-      iconBase64: "data:image/png;base64,${selectedIcon!.codePoint}",
-    );
+      final response = await TeamService.createTeam(
+        userId: userId,
+        teamName: teamNameC.text.trim(),
+        year: yearC.text.trim().isEmpty ? "2026" : yearC.text.trim(),
+        description: descriptionC.text.trim().isEmpty
+            ? "Default description"
+            : descriptionC.text.trim(),
+        iconBase64: selectedIcon != null
+            ? selectedIcon!.codePoint.toString()
+            : "",
+      );
 
-    print("Create Team Loader Stopped");
-    print("Create Team Final Result: $result");
-
-    if (!mounted) return;
-
-    setState(() => isLoading = false);
-
-    if (result["success"] == true) {
-      print("Team Created Successfully");
-      print("Invite Code: ${result["data"]["invite_code"]}");
-
-      showToastMessage(result["message"] ?? "Team Created Successfully!");
-
-      Future.delayed(const Duration(milliseconds: 700), () {
-        if (!mounted) return;
+      if (response["success"] == true) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(response["message"])),
+        );
 
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(
-            builder: (context) => WidgetTree(),
-          ),
+          MaterialPageRoute(builder: (_) => const WidgetTree()),
         );
-      });
-    } else {
-      print("Create Team Failed: ${result["message"]}");
-      showToastMessage(result["message"] ?? "Something went wrong");
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(response["message"])),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Something went wrong")),
+      );
+    } finally {
+      setState(() => isLoading = false);
     }
   }
 
@@ -125,172 +77,266 @@ class _CreateTeamScreenState extends State<CreateTeamScreen> {
     return Scaffold(
       body: Bg(
         child: SafeArea(
-          child: Stack(
-            children: [
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 18),
-                child: SingleChildScrollView(
-                  physics: const BouncingScrollPhysics(),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 21),
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SizedBox(height: mq.height * 0.018),
+
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      SizedBox(height: mq.height * 0.035),
-
-                      Row(
-                        children: [
-                          BackCircle(
-                            onTap: () => Navigator.pop(context),
+                      GestureDetector(
+                        onTap: () => Navigator.pop(context),
+                        child: Container(
+                          height: 48,
+                          width: 48,
+                          decoration: const BoxDecoration(
+                            color: Colors.white,
+                            shape: BoxShape.circle,
                           ),
-                          const Spacer(),
-                          Container(
-                            height: 44,
-                            width: 45,
-                            decoration: const BoxDecoration(
-                              image: DecorationImage(
-                                image: AssetImage("assets/images/Logo.png"),
-                              ),
-                            ),
+                          child: const Icon(
+                            Icons.arrow_back_ios_new_rounded,
+                            color: Color(0xFF287D80),
+                            size: 18,
                           ),
-                        ],
-                      ),
-
-                      const SizedBox(height: 16),
-
-                      const Text(
-                        "Step 1 of 2",
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w700,
-                          fontFamily: "Mynor",
                         ),
                       ),
-
-                      const SizedBox(height: 10),
-
-                      Row(
-                        children: [
-                          Expanded(child: ProgressLine(active: true)),
-                          const SizedBox(width: 18),
-                          Expanded(child: ProgressLine(active: true)),
-                        ],
+                      Image.asset(
+                        "assets/images/Logo.png",
+                        height: 47,
+                        width: 47,
                       ),
-
-                      SizedBox(height: mq.height * 0.025),
-
-                      const Text(
-                        "Create Team",
-                        style: TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.w900,
-                          fontFamily: "Mynor",
-                          color: Colors.white,
-                        ),
-                      ),
-
-                      const SizedBox(height: 4),
-
-                      const Text(
-                        "Enter Team Details to create a Team!",
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          fontFamily: "Mynor",
-                          color: Colors.white,
-                        ),
-                      ),
-
-                      SizedBox(height: mq.height * 0.03),
-
-                      RoundedField(
-                        hint: "Team Name...",
-                        controller: teamNameC,
-                      ),
-
-                      const SizedBox(height: 5),
-
-                      DropdownField(
-                        value: sessionYear,
-                        items: const [
-                          "2020 / 2021",
-                          "2021 / 2022",
-                          "2022 / 2023",
-                          "2023 / 2024",
-                          "2024 / 2025",
-                          "2025 / 2026",
-                          "2026 / 2027",
-                        ],
-                        onChanged: (val) {
-                          if (val != null) {
-                            setState(() => sessionYear = val);
-                          }
-                        },
-                      ),
-
-                      const SizedBox(height: 5),
-
-                      RoundedField(
-                        hint: "Description...",
-                        controller: descC,
-                        maxLines: 4,
-                        height: 118,
-                      ),
-
-                      const SizedBox(height: 5),
-
-                      UploadField(
-                        text: "Team Icon Upload",
-                        isSelected: selectedIcon != null,
-                        selectedIcon: selectedIcon,
-                        onTap: () async {
-                          final icon = await showDialog<IconData>(
-                            context: context,
-                            builder: (_) => const IconPickerDialog(),
-                          );
-
-                          if (icon != null) {
-                            setState(() {
-                              selectedIcon = icon;
-                            });
-
-                            print("Selected Icon CodePoint: ${icon.codePoint}");
-                          }
-                        },
-                      ),
-
-                      SizedBox(height: mq.height * 0.078),
-
-                      Opacity(
-                        opacity: isLoading ? 0.6 : 1,
-                        child: BigButton(
-                          text: "Create Team",
-                          onTap: () {
-                            if (isLoading) return;
-                            createTeamApi();
-                          },
-                        ),
-                      ),
-
-                      const SizedBox(height: 25),
                     ],
                   ),
-                ),
-              ),
 
-              if (isLoading)
-                Container(
-                  height: double.infinity,
-                  width: double.infinity,
-                  color: Colors.black.withOpacity(0.35),
-                  child: const Center(
-                    child: CircularProgressIndicator(
+                  SizedBox(height: mq.height * 0.045),
+
+                  const Text(
+                    "Create Team",
+                    style: TextStyle(
                       color: Colors.white,
+                      fontSize: 20,
+                      fontFamily: "Mynor",
+                      fontWeight: FontWeight.w800,
                     ),
                   ),
-                ),
-            ],
+
+                  const SizedBox(height: 4),
+
+                  const Text(
+                    "Initialize your high-performance engineering unit.",
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontFamily: "Mynor",
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+
+                  SizedBox(height: mq.height * 0.035),
+
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.fromLTRB(26, 34, 26, 24),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF8CCDCF).withOpacity(0.23),
+                      borderRadius: BorderRadius.circular(18),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          "TEAM NAME",
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+
+                        TextField(
+                          controller: teamNameC,
+                          style: const TextStyle(color: Colors.white),
+                          decoration: _inputDecoration("e.g. Aerodynamics Lead"),
+                        ),
+
+                        const SizedBox(height: 18),
+
+                        const Text(
+                          "YEAR",
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+
+                        TextField(
+                          controller: yearC,
+                          style: const TextStyle(color: Colors.white),
+                          keyboardType: TextInputType.number,
+                          decoration: _inputDecoration("e.g. 2026"),
+                        ),
+
+                        const SizedBox(height: 18),
+
+                        const Text(
+                          "DESCRIPTION",
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+
+                        TextField(
+                          controller: descriptionC,
+                          maxLines: 3,
+                          style: const TextStyle(color: Colors.white),
+                          decoration:
+                          _inputDecoration("Short team description"),
+                        ),
+
+                        const SizedBox(height: 18),
+
+                        const Text(
+                          "TEAM ICON",
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+
+                        GestureDetector(
+                          onTap: () async {
+                            final icon = await showDialog<IconData>(
+                              context: context,
+                              builder: (_) => const IconPickerDialog(),
+                            );
+
+                            if (icon != null) {
+                              setState(() => selectedIcon = icon);
+                            }
+                          },
+                          child: Container(
+                            height: 50,
+                            padding: const EdgeInsets.symmetric(horizontal: 18),
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(28),
+                              border: Border.all(
+                                color: Colors.white.withOpacity(0.4),
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                Text(
+                                  selectedIcon == null
+                                      ? "Upload Team Icon"
+                                      : "Icon Selected",
+                                  style: TextStyle(
+                                      color: Colors.white.withOpacity(0.9)),
+                                ),
+                                const Spacer(),
+                                Icon(
+                                  selectedIcon ?? Icons.upload_rounded,
+                                  color: Colors.white,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 26),
+
+                  SizedBox(
+                    width: double.infinity,
+                    height: 45,
+                    child: ElevatedButton(
+                      onPressed: isLoading ? null : createTeam,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF287D80),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(25),
+                        ),
+                      ),
+                      child: isLoading
+                          ? const SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(
+                          color: Colors.white,
+                          strokeWidth: 2,
+                        ),
+                      )
+                          : const Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text("Create Team",
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w900,
+                              )),
+                          SizedBox(width: 8),
+                          Icon(Icons.rocket_launch_outlined,
+                              size: 18, color: Colors.white),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  SizedBox(height: mq.height * 0.04),
+                ],
+              ),
+            ),
           ),
         ),
       ),
     );
   }
+
+  InputDecoration _inputDecoration(String hint) {
+    return InputDecoration(
+      hintText: hint,
+      hintStyle: TextStyle(color: Colors.white.withOpacity(0.7)),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(28),
+        borderSide: BorderSide(color: Colors.white.withOpacity(0.4)),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(28),
+        borderSide: const BorderSide(color: Colors.white),
+      ),
+    );
+  }
 }
+
+// /// Dummy Next Screen
+// class DummyNextScreen extends StatelessWidget {
+//   const DummyNextScreen({super.key});
+//
+//   @override
+//   Widget build(BuildContext context) {
+//     return const Scaffold(
+//       backgroundColor: Color(0xFF287D80),
+//       body: Center(
+//         child: Text(
+//           "Team Created Successfully 🚀",
+//           style: TextStyle(color: Colors.white, fontSize: 20),
+//         ),
+//       ),
+//     );
+//   }
+// }

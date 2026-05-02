@@ -5,6 +5,7 @@ import 'package:stemflow/Widgets/background.dart';
 import 'package:stemflow/Widgets/progless_line.dart';
 import 'package:stemflow/Widgets/roundedfield.dart';
 import 'package:stemflow/services/join_team_service.dart';
+import 'package:stemflow/Services/session_manager.dart';
 
 class JoinTeamScreen extends StatefulWidget {
   const JoinTeamScreen({super.key});
@@ -57,15 +58,15 @@ class _JoinTeamScreenState extends State<JoinTeamScreen> {
     }
 
     setState(() => isLoading = true);
-    print("Join Team Loader Started");
 
     try {
+      final userIdText = await SessionManager.instance.getUserId();
+      final userId = int.tryParse(userIdText) ?? 0;
+
       final result = await JoinTeamService.joinTeam(
-        userId: 6,
+        userId: userId,
         inviteCode: codeC.text.trim(),
       );
-
-      print("Join Team Final Result: $result");
 
       if (!mounted) return;
 
@@ -75,14 +76,11 @@ class _JoinTeamScreenState extends State<JoinTeamScreen> {
         showToast(result["message"] ?? "Failed to join team");
       }
     } catch (e) {
-      print("Join Team Error: $e");
-
       if (!mounted) return;
       showToast("Something went wrong. Please try again.");
     } finally {
       if (mounted) {
         setState(() => isLoading = false);
-        print("Join Team Loader Stopped");
       }
     }
   }
@@ -104,7 +102,6 @@ class _JoinTeamScreenState extends State<JoinTeamScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       SizedBox(height: mq.height * 0.035),
-
                       Row(
                         children: [
                           BackCircle(
@@ -122,9 +119,7 @@ class _JoinTeamScreenState extends State<JoinTeamScreen> {
                           ),
                         ],
                       ),
-
                       const SizedBox(height: 16),
-
                       const Text(
                         "Step 1 of 2",
                         style: TextStyle(
@@ -133,9 +128,7 @@ class _JoinTeamScreenState extends State<JoinTeamScreen> {
                           fontFamily: "Mynor",
                         ),
                       ),
-
                       const SizedBox(height: 10),
-
                       const Row(
                         children: [
                           Expanded(child: ProgressLine(active: true)),
@@ -143,9 +136,7 @@ class _JoinTeamScreenState extends State<JoinTeamScreen> {
                           Expanded(child: ProgressLine(active: true)),
                         ],
                       ),
-
                       SizedBox(height: mq.height * 0.06),
-
                       Center(
                         child: Image.asset(
                           "assets/images/jointeam_image.png",
@@ -153,9 +144,7 @@ class _JoinTeamScreenState extends State<JoinTeamScreen> {
                           width: 211,
                         ),
                       ),
-
                       SizedBox(height: mq.height * 0.036),
-
                       const Text(
                         "Join Team",
                         style: TextStyle(
@@ -165,9 +154,7 @@ class _JoinTeamScreenState extends State<JoinTeamScreen> {
                           color: Colors.white,
                         ),
                       ),
-
                       const SizedBox(height: 4),
-
                       const Text(
                         "Enter Invite Code to join Team!",
                         style: TextStyle(
@@ -177,16 +164,12 @@ class _JoinTeamScreenState extends State<JoinTeamScreen> {
                           color: Colors.white,
                         ),
                       ),
-
                       SizedBox(height: mq.height * 0.03),
-
                       RoundedField(
                         hint: "Enter Code...",
                         controller: codeC,
                       ),
-
                       SizedBox(height: mq.height * 0.033),
-
                       Opacity(
                         opacity: isLoading ? 0.6 : 1,
                         child: BigButton(
@@ -197,13 +180,11 @@ class _JoinTeamScreenState extends State<JoinTeamScreen> {
                           },
                         ),
                       ),
-
                       const SizedBox(height: 25),
                     ],
                   ),
                 ),
               ),
-
               if (isLoading)
                 Container(
                   height: double.infinity,

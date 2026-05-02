@@ -1,15 +1,15 @@
-import 'dart:convert';
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:stemflow/Services/add_task_service.dart';
+import 'package:stemflow/Services/show_phase_service.dart';
+import 'package:stemflow/Services/team_details_service.dart';
 import 'package:stemflow/TaskDetailScreen.dart';
 import 'package:stemflow/Widgets/backcircle.dart';
 import 'package:stemflow/Widgets/background.dart';
-import 'package:stemflow/team_side%20screens/BottomNavigation_screen_teamSide.dart';
-import 'Services/add_task_service.dart';
-import 'Services/show_phase_service.dart';
-import 'Services/team_details_service.dart';
-import 'models/phase_model.dart';
-import 'models/member_model.dart';
+import 'package:stemflow/models/member_model.dart';
+import 'package:stemflow/models/phase_model.dart';
+import 'package:stemflow/Services/session_manager.dart';
+import 'package:stemflow/team_side%20screens/BottomNavigation_screen_teamSide.dart'; // Added import for SessionManager
 
 class CreateTaskScreen extends StatefulWidget {
   final int projectId;
@@ -45,9 +45,6 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
   String selectedPriority = "LOW";
   DateTime? selectedDate;
 
-  final int _userId = 1;
-  final String _apiKey = "YOUR_API_KEY_HERE";
-
   @override
   void initState() {
     super.initState();
@@ -65,15 +62,23 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
   Future<void> _fetchPhases() async {
     setState(() => _isLoadingPhases = true);
     try {
+      final userIdText = await SessionManager.instance.getUserId();
+      final userId = int.tryParse(userIdText) ?? 0;
+
+      print('[CreateTaskScreen] Fetching phases — userId: $userId, projectId: ${widget.projectId}');
+
       final result = await ShowPhaseService.getProjectPhases(
-        userId: _userId,
+        userId: userId,
         projectId: widget.projectId,
-        apiKey: _apiKey,
+        // apiKey hata diya ✓
       );
       if (!mounted) return;
       setState(() => _phases = result);
+
+      print('[CreateTaskScreen] Phases loaded: ${_phases.length}');
     } catch (e) {
       if (!mounted) return;
+      print('[CreateTaskScreen] Phase error: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Phases: ${e.toString()}')),
       );
@@ -137,8 +142,11 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
           "${selectedDate!.month.toString().padLeft(2, '0')}-"
           "${selectedDate!.day.toString().padLeft(2, '0')}";
 
+      final userIdText = await SessionManager.instance.getUserId();
+      final userId = int.tryParse(userIdText) ?? 0;
+
       final Map<String, dynamic> createdTask = await AddTaskService.addTask(
-        userId: _userId,
+        userId: userId,  // Now using dynamic userId
         teamId: widget.teamId,
         phaseId: _selectedPhase!.id,
         title: title,

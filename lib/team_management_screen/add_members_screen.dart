@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:stemflow/Widgets/background.dart';
+import 'package:stemflow/Services/session_manager.dart';  // Added import for SessionManager
 
 class AddMemberScreen1 extends StatefulWidget {
   const AddMemberScreen1({super.key});
@@ -37,7 +38,6 @@ class _AddMemberScreen1State extends State<AddMemberScreen1> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: Bg(
-
         child: SafeArea(
           child: LayoutBuilder(
             builder: (context, constraints) {

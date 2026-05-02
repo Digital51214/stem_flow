@@ -140,7 +140,7 @@ class _TaskCard extends StatelessWidget {
                 style: TextStyle(
                   color: statusColor,
                   fontSize: mq.width * 0.026,
-                  fontWeight: FontWeight.w700,
+                  fontWeight: FontWeight.w700
                 ),
               ),
             ],

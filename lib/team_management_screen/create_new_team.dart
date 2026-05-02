@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:stemflow/Widgets/IconPickerDialog.dart';
+import 'package:stemflow/team_management_screen/your_team_list.dart';
 import '../Widgets/background.dart';
-import '../services/team_service.dart'; // <-- apna service path
+import '../services/team_service.dart';
+import 'package:stemflow/Services/session_manager.dart';
 
 class CreateTeamScreen extends StatefulWidget {
   const CreateTeamScreen({super.key});
@@ -19,7 +21,6 @@ class _CreateTeamScreenState extends State<CreateTeamScreen> {
 
   bool isLoading = false;
 
-  /// ================= API CALL =================
   Future<void> createTeam() async {
     if (teamNameC.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -31,10 +32,11 @@ class _CreateTeamScreenState extends State<CreateTeamScreen> {
     setState(() => isLoading = true);
 
     try {
-      print("Creating team from UI...");
+      final userIdText = await SessionManager.instance.getUserId();
+      final userId = int.tryParse(userIdText) ?? 0;
 
       final response = await TeamService.createTeam(
-        userId: 1,
+        userId: userId,
         teamName: teamNameC.text.trim(),
         year: yearC.text.trim().isEmpty ? "2026" : yearC.text.trim(),
         description: descriptionC.text.trim().isEmpty
@@ -45,8 +47,6 @@ class _CreateTeamScreenState extends State<CreateTeamScreen> {
             : "",
       );
 
-      print("UI Response: $response");
-
       if (response["success"] == true) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(response["message"])),
@@ -54,7 +54,7 @@ class _CreateTeamScreenState extends State<CreateTeamScreen> {
 
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (_) => const DummyNextScreen()),
+          MaterialPageRoute(builder: (_) => const YourTeamsScreen()),
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -62,8 +62,6 @@ class _CreateTeamScreenState extends State<CreateTeamScreen> {
         );
       }
     } catch (e) {
-      print("UI Error: $e");
-
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Something went wrong")),
       );
@@ -87,7 +85,6 @@ class _CreateTeamScreenState extends State<CreateTeamScreen> {
                 children: [
                   SizedBox(height: mq.height * 0.018),
 
-                  /// TOP BAR
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -141,7 +138,6 @@ class _CreateTeamScreenState extends State<CreateTeamScreen> {
 
                   SizedBox(height: mq.height * 0.035),
 
-                  /// FORM CARD
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.fromLTRB(26, 34, 26, 24),
@@ -152,7 +148,6 @@ class _CreateTeamScreenState extends State<CreateTeamScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        /// TEAM NAME
                         const Text(
                           "TEAM NAME",
                           style: TextStyle(
@@ -171,7 +166,6 @@ class _CreateTeamScreenState extends State<CreateTeamScreen> {
 
                         const SizedBox(height: 18),
 
-                        /// YEAR
                         const Text(
                           "YEAR",
                           style: TextStyle(
@@ -191,7 +185,6 @@ class _CreateTeamScreenState extends State<CreateTeamScreen> {
 
                         const SizedBox(height: 18),
 
-                        /// DESCRIPTION
                         const Text(
                           "DESCRIPTION",
                           style: TextStyle(
@@ -212,7 +205,6 @@ class _CreateTeamScreenState extends State<CreateTeamScreen> {
 
                         const SizedBox(height: 18),
 
-                        /// ICON PICKER
                         const Text(
                           "TEAM ICON",
                           style: TextStyle(
@@ -267,7 +259,6 @@ class _CreateTeamScreenState extends State<CreateTeamScreen> {
 
                   const SizedBox(height: 26),
 
-                  /// BUTTON
                   SizedBox(
                     width: double.infinity,
                     height: 45,
@@ -333,19 +324,19 @@ class _CreateTeamScreenState extends State<CreateTeamScreen> {
 }
 
 /// Dummy Next Screen
-class DummyNextScreen extends StatelessWidget {
-  const DummyNextScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return const Scaffold(
-      backgroundColor: Color(0xFF287D80),
-      body: Center(
-        child: Text(
-          "Team Created Successfully 🚀",
-          style: TextStyle(color: Colors.white, fontSize: 20),
-        ),
-      ),
-    );
-  }
-}
+// class DummyNextScreen extends StatelessWidget {
+//   const DummyNextScreen({super.key});
+//
+//   @override
+//   Widget build(BuildContext context) {
+//     return const Scaffold(
+//       backgroundColor: Color(0xFF287D80),
+//       body: Center(
+//         child: Text(
+//           "Team Created Successfully 🚀",
+//           style: TextStyle(color: Colors.white, fontSize: 20),
+//         ),
+//       ),
+//     );
+//   }
+// }

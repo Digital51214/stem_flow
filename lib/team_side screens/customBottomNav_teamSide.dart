@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-final ValueNotifier<int> selectedPageNotifier = ValueNotifier<int>(0);
+final ValueNotifier<int> selectedPageNotifier1  = ValueNotifier<int>(0);
 
 class ImageLikeBottomNavBar2 extends StatelessWidget {
   const ImageLikeBottomNavBar2({super.key});
@@ -11,7 +11,7 @@ class ImageLikeBottomNavBar2 extends StatelessWidget {
     final bottomPadding = MediaQuery.of(context).padding.bottom;
 
     return ValueListenableBuilder<int>(
-      valueListenable: selectedPageNotifier,
+      valueListenable: selectedPageNotifier1,
       builder: (context, selectedIndex, _) {
         return BottomAppBar(
           color: const Color(0xFF1E7F7A),
@@ -29,7 +29,7 @@ class ImageLikeBottomNavBar2 extends StatelessWidget {
                     label: "Home",
                     isSelected: selectedIndex == 0,
                     onTap: () {
-                      selectedPageNotifier.value = 0;
+                      selectedPageNotifier1.value = 0;
                     },
                   ),
 
@@ -38,7 +38,7 @@ class ImageLikeBottomNavBar2 extends StatelessWidget {
                     label: "Tasks",
                     isSelected: selectedIndex == 1,
                     onTap: () {
-                      selectedPageNotifier.value = 1;
+                      selectedPageNotifier1.value = 1;
                     },
                   ),
 
@@ -49,7 +49,7 @@ class ImageLikeBottomNavBar2 extends StatelessWidget {
                     label: "Events",
                     isSelected: selectedIndex == 3,
                     onTap: () {
-                      selectedPageNotifier.value = 3;
+                      selectedPageNotifier1.value = 3;
                     },
                   ),
 
@@ -58,7 +58,7 @@ class ImageLikeBottomNavBar2 extends StatelessWidget {
                     label: "More",
                     isSelected: selectedIndex == 4,
                     onTap: () {
-                      selectedPageNotifier.value = 4;
+                      selectedPageNotifier1.value = 4;
                     },
                   ),
                 ],
@@ -79,7 +79,7 @@ class CenterAiButton2 extends StatelessWidget {
     final mq = MediaQuery.of(context).size;
 
     return ValueListenableBuilder<int>(
-      valueListenable: selectedPageNotifier,
+      valueListenable: selectedPageNotifier1,
       builder: (context, selectedIndex, _) {
         final bool isSelected = selectedIndex == 2;
 
@@ -88,7 +88,7 @@ class CenterAiButton2 extends StatelessWidget {
           backgroundColor: const Color(0xFF1E7F7A),
           shape: const CircleBorder(),
           onPressed: () {
-            selectedPageNotifier.value = 2;
+            selectedPageNotifier1.value = 2;
           },
           child:Image.asset("assets/images/ai.png",
             width: mq.width * 0.09,color: Colors.white,)

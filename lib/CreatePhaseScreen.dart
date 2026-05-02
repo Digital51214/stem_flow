@@ -2,14 +2,13 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:stemflow/Widgets/backcircle.dart';
 import 'package:stemflow/Widgets/background.dart';
-
-import 'PhaseDetailScreen.dart';
-
-import 'Services/show_project_list.dart';
-import 'Services/team_list_service.dart';
-import 'models/project_model.dart';
-import 'models/teams_models.dart';
-import 'services/add_phase_service.dart';
+import 'package:stemflow/Services/show_project_list.dart';
+import 'package:stemflow/Services/team_list_service.dart';
+import 'package:stemflow/Services/add_phase_service.dart';
+import 'package:stemflow/Services/session_manager.dart';
+import 'package:stemflow/models/project_model.dart';
+import 'package:stemflow/models/teams_models.dart';
+import 'package:stemflow/PhaseDetailScreen.dart';
 
 class CreatePhaseScreen extends StatefulWidget {
   const CreatePhaseScreen({super.key});
@@ -31,19 +30,6 @@ class _CreatePhaseScreenState extends State<CreatePhaseScreen> {
   ProjectModel? selectedProject;
   MyTeamModel? selectedTeam;
 
-  final int userId = 1;
-  final String apiKey = "YOUR_API_KEY_HERE";
-
-  /// ✅ ONLY ADD THIS FUNCTION
-  void showToast(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: const Color(0xFF287D80),
-      ),
-    );
-  }
-
   @override
   void initState() {
     super.initState();
@@ -51,79 +37,69 @@ class _CreatePhaseScreenState extends State<CreatePhaseScreen> {
   }
 
   Future<void> fetchDropdownData() async {
-    setState(() {
-      isLoading = true;
-    });
+    setState(() => isLoading = true);
 
     try {
-      print("Fetching projects and teams...");
+      final userIdText = await SessionManager.instance.getUserId();
+      final userId = int.tryParse(userIdText) ?? 0;
 
       final projectResult = await ShowProjectService.getUserProjects(
         userId: userId,
-        apiKey: apiKey,
+        apiKey: "YOUR_API_KEY_HERE",
       );
 
       final teamResult = await MyTeamService.getMyTeams(
         userId: userId,
-        apiKey: apiKey,
+        apiKey: "YOUR_API_KEY_HERE",
       );
-
-      print("Projects Loaded: ${projectResult.length}");
-      print("Teams Loaded: ${teamResult.length}");
-
-      if (!mounted) return;
 
       setState(() {
         projects = projectResult;
         teams = teamResult;
       });
     } catch (e) {
-      print("Dropdown Data Error: $e");
-
-      if (!mounted) return;
-
-      /// ✅ CHANGED ONLY THIS
-      showToast(e.toString());
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e')),
+      );
     } finally {
-      if (!mounted) return;
-
-      setState(() {
-        isLoading = false;
-      });
+      setState(() => isLoading = false);
     }
   }
 
   Future<void> savePhase() async {
     if (phaseNameC.text.trim().isEmpty) {
-      showToast("Phase name required");
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Phase name required")),
+      );
       return;
     }
 
     if (selectedProject == null) {
-      showToast("Please select project");
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please select project")),
+      );
       return;
     }
 
     if (selectedTeam == null) {
-      showToast("Please select team");
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please select team")),
+      );
       return;
     }
 
     if (descriptionC.text.trim().isEmpty) {
-      showToast("Description required");
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Description required")),
+      );
       return;
     }
 
-    setState(() {
-      isSaving = true;
-    });
+    setState(() => isSaving = true);
 
     try {
-      print("Saving phase from UI...");
-      print("Selected Project ID: ${selectedProject!.id}");
-      print("Selected Project Name: ${selectedProject!.projectName}");
-      print("Selected Team ID: ${selectedTeam!.id}");
-      print("Selected Team Name: ${selectedTeam!.name}");
+      final userIdText = await SessionManager.instance.getUserId();
+      final userId = int.tryParse(userIdText) ?? 0;
 
       final response = await AddPhaseService.addPhase(
         userId: userId,
@@ -131,37 +107,28 @@ class _CreatePhaseScreenState extends State<CreatePhaseScreen> {
         projectId: selectedProject!.id,
         phaseName: phaseNameC.text.trim(),
         phaseDescription: descriptionC.text.trim(),
-        apiKey: apiKey,
+        apiKey: "YOUR_API_KEY_HERE",
       );
 
-      print("Save Phase UI Response: $response");
-
-      if (!mounted) return;
-
       if (response["success"] == true) {
-        showToast(response["message"]);
-
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(response["message"] ?? "Phase created")),
+        );
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(
-            builder: (context) => PhaseDetailsScreen(),
-          ),
+          MaterialPageRoute(builder: (context) => PhaseDetailsScreen()),
         );
       } else {
-        showToast(response["message"]);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(response["message"] ?? "Failed to create phase")),
+        );
       }
     } catch (e) {
-      print("Save Phase UI Error: $e");
-
-      if (!mounted) return;
-
-      showToast("Something went wrong");
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e')),
+      );
     } finally {
-      if (!mounted) return;
-
-      setState(() {
-        isSaving = false;
-      });
+      setState(() => isSaving = false);
     }
   }
 
@@ -188,7 +155,6 @@ class _CreatePhaseScreenState extends State<CreatePhaseScreen> {
                 ),
               ),
             ),
-
             SafeArea(
               child: SingleChildScrollView(
                 padding: EdgeInsets.symmetric(horizontal: mq.width * 0.042),
@@ -196,7 +162,6 @@ class _CreatePhaseScreenState extends State<CreatePhaseScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     SizedBox(height: mq.height * 0.025),
-
                     Row(
                       children: [
                         BackCircle(onTap: () => Navigator.pop(context)),
@@ -208,9 +173,7 @@ class _CreatePhaseScreenState extends State<CreatePhaseScreen> {
                         ),
                       ],
                     ),
-
                     SizedBox(height: mq.height * 0.045),
-
                     Text(
                       "Phase Details",
                       style: TextStyle(
@@ -220,9 +183,7 @@ class _CreatePhaseScreenState extends State<CreatePhaseScreen> {
                         fontWeight: FontWeight.w900,
                       ),
                     ),
-
                     SizedBox(height: mq.height * 0.028),
-
                     if (isLoading)
                       SizedBox(
                         height: mq.height * 0.45,
@@ -246,17 +207,13 @@ class _CreatePhaseScreenState extends State<CreatePhaseScreen> {
                             children: [
                               const _Label("PHASE NAME"),
                               SizedBox(height: mq.height * 0.012),
-
                               _CustomTextField(
                                 controller: phaseNameC,
                                 hint: "e.g. Manufacturing",
                               ),
-
                               SizedBox(height: mq.height * 0.018),
-
                               const _Label("SELECT PROJECT"),
                               SizedBox(height: mq.height * 0.012),
-
                               _ProjectDropdown(
                                 hint: "Select Project",
                                 value: selectedProject,
@@ -267,12 +224,9 @@ class _CreatePhaseScreenState extends State<CreatePhaseScreen> {
                                   });
                                 },
                               ),
-
                               SizedBox(height: mq.height * 0.018),
-
                               const _Label("SELECT TEAM"),
                               SizedBox(height: mq.height * 0.012),
-
                               _TeamDropdown(
                                 hint: "Select Team",
                                 value: selectedTeam,
@@ -283,24 +237,18 @@ class _CreatePhaseScreenState extends State<CreatePhaseScreen> {
                                   });
                                 },
                               ),
-
                               SizedBox(height: mq.height * 0.018),
-
                               const _Label("DESCRIPTION"),
                               SizedBox(height: mq.height * 0.012),
-
                               _DescriptionField(
                                 controller: descriptionC,
-                                hint:
-                                "In this phase, the team focuses on\noptimizing how air flows...",
+                                hint: "In this phase, the team focuses on\noptimizing how air flows...",
                               ),
                             ],
                           ),
                         ),
                       ),
-
                     SizedBox(height: mq.height * 0.028),
-
                     SizedBox(
                       width: double.infinity,
                       height: mq.height * 0.058,
@@ -327,7 +275,6 @@ class _CreatePhaseScreenState extends State<CreatePhaseScreen> {
                         ),
                       ),
                     ),
-
                     SizedBox(height: mq.height * 0.06),
                   ],
                 ),

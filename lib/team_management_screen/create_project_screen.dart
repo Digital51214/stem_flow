@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:stemflow/Widgets/background.dart';
-
+import 'package:stemflow/Services/session_manager.dart';  // Added import for SessionManager
 import '../Services/create_project_service.dart';
-
 
 class CreateProjectScreen extends StatefulWidget {
   const CreateProjectScreen({super.key});
@@ -59,12 +58,15 @@ class _CreateProjectScreenState extends State<CreateProjectScreen> {
     });
 
     try {
+      final userIdText = await SessionManager.instance.getUserId();
+      final userId = int.tryParse(userIdText) ?? 0;
+
       print("Save Project Button Pressed");
       print("Project Name: $projectName");
       print("Description: $description");
 
       final result = await ProjectService.createProject(
-        userId: 1,
+        userId: userId,  // Now using dynamic userId
         projectName: projectName,
         description: description,
       );

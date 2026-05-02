@@ -35,7 +35,7 @@ class WidgetTree2 extends StatelessWidget {
       extendBody: true,
       resizeToAvoidBottomInset: false,
       body: ValueListenableBuilder<int>(
-        valueListenable: selectedPageNotifier,
+        valueListenable: selectedPageNotifier1,
         builder: (context, selectedPage, child) {
           return pages[selectedPage];
         },

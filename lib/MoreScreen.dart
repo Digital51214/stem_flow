@@ -1,10 +1,13 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:stemflow/Authonticator_screens/Login_screen.dart';
 import 'package:stemflow/Changepassword_screen.dart';
 import 'package:stemflow/EditProfile_screen.dart';
 import 'package:stemflow/services/session_manager.dart';
+
 import 'AiInsights.dart';
 import 'EventsScreen.dart';
+import 'Services/delete_account.dart';
 import 'Widgets/background.dart';
 
 class Morescreen extends StatefulWidget {
@@ -28,19 +31,11 @@ class _MorescreenState extends State<Morescreen> {
 
   Future<void> loadUserData() async {
     try {
-      print("=== LOAD USER DATA START ===");
-
       final userData = await SessionManager.instance.getUserData();
       final username = await SessionManager.instance.getUsername();
       final fullName = await SessionManager.instance.getFullName();
       final email = await SessionManager.instance.getEmail();
       final pic = await SessionManager.instance.getProfilePic();
-
-      print("UserData map from session: $userData");
-      print("Username from session: $username");
-      print("Full Name from session: $fullName");
-      print("Email from session: $email");
-      print("Profile Pic from session: $pic");
 
       final finalName = fullName.isNotEmpty
           ? fullName
@@ -62,15 +57,7 @@ class _MorescreenState extends State<Morescreen> {
         profilePic = finalProfilePic == "null" ? "" : finalProfilePic;
         isLoading = false;
       });
-
-      print("=== LOAD USER DATA SUCCESS ===");
-      print("Final Name: $userName");
-      print("Final Email: $userEmail");
-      print("Final Profile Pic: $profilePic");
     } catch (e) {
-      print("=== LOAD USER DATA ERROR ===");
-      print("Error: $e");
-
       setState(() {
         userName = "User";
         userEmail = "No Email";
@@ -82,20 +69,42 @@ class _MorescreenState extends State<Morescreen> {
 
   Future<void> logoutUser() async {
     try {
-      print("=== LOGOUT START ===");
       await SessionManager.instance.clearSession();
-      print("=== LOGOUT SUCCESS ===");
-
       if (!mounted) return;
-
       Navigator.pushAndRemoveUntil(
         context,
         MaterialPageRoute(builder: (context) => const LoginScreen()),
             (route) => false,
       );
     } catch (e) {
-      print("=== LOGOUT ERROR ===");
-      print("Error: $e");
+      print("Logout error: $e");
+    }
+  }
+
+  Future<void> deleteAccount() async {
+    try {
+      final userIdText = await SessionManager.instance.getUserId();
+      final userId = int.tryParse(userIdText) ?? 0;
+
+      await DeleteAccountService.deleteAccount(userId: userId);
+
+      await SessionManager.instance.clearSession();
+
+      if (!mounted) return;
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (context) => const LoginScreen()),
+            (route) => false,
+      );
+    } catch (e) {
+      print("Delete account error: $e");
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error: ${e.toString()}'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
     }
   }
 
@@ -108,9 +117,6 @@ class _MorescreenState extends State<Morescreen> {
           width: mq.height * 0.2,
           fit: BoxFit.cover,
           errorBuilder: (context, error, stackTrace) {
-            print("=== PROFILE IMAGE LOAD ERROR ===");
-            print(error.toString());
-
             return Image.asset(
               "assets/images/profile.png",
               height: mq.height * 0.2,
@@ -207,9 +213,7 @@ class _MorescreenState extends State<Morescreen> {
                   children: [
                     Expanded(
                       child: GestureDetector(
-                        onTap: () {
-                          Navigator.pop(context);
-                        },
+                        onTap: () => Navigator.pop(context),
                         child: Container(
                           height: mq.height * 0.056,
                           alignment: Alignment.center,
@@ -275,6 +279,149 @@ class _MorescreenState extends State<Morescreen> {
     );
   }
 
+  void showDeleteDialog() {
+    final mq = MediaQuery.of(context).size;
+
+    showDialog(
+      context: context,
+      barrierColor: Colors.black.withOpacity(0.55),
+      builder: (context) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: EdgeInsets.symmetric(horizontal: mq.width * 0.08),
+          child: Container(
+            padding: EdgeInsets.symmetric(
+              horizontal: mq.width * 0.06,
+              vertical: mq.height * 0.028,
+            ),
+            decoration: BoxDecoration(
+              color: const Color(0xFF103E46).withOpacity(0.96),
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(
+                color: Colors.white.withOpacity(0.14),
+                width: 1.2,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.28),
+                  blurRadius: 20,
+                  offset: const Offset(0, 10),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  height: mq.width * 0.15,
+                  width: mq.width * 0.15,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: const Color(0xffD94C4C).withOpacity(0.16),
+                    border: Border.all(
+                      color: const Color(0xffD94C4C).withOpacity(0.45),
+                      width: 1.2,
+                    ),
+                  ),
+                  child: Icon(
+                    Icons.delete_forever_rounded,
+                    color: const Color(0xffD94C4C),
+                    size: mq.width * 0.075,
+                  ),
+                ),
+                SizedBox(height: mq.height * 0.02),
+                Text(
+                  "Delete Account",
+                  style: TextStyle(
+                    fontFamily: "Mynor",
+                    fontWeight: FontWeight.w800,
+                    fontSize: mq.width * 0.05,
+                    color: Colors.white,
+                  ),
+                ),
+                SizedBox(height: mq.height * 0.01),
+                Text(
+                  "Are you sure you want to permanently delete your account? This action cannot be undone.",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontFamily: "Mynor",
+                    fontSize: mq.width * 0.034,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.white.withOpacity(0.82),
+                    height: 1.4,
+                  ),
+                ),
+                SizedBox(height: mq.height * 0.028),
+                Row(
+                  children: [
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () => Navigator.pop(context),
+                        child: Container(
+                          height: mq.height * 0.056,
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.08),
+                            borderRadius: BorderRadius.circular(40),
+                            border: Border.all(
+                              color: Colors.white.withOpacity(0.14),
+                            ),
+                          ),
+                          child: Text(
+                            "Cancel",
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontFamily: "Mynor",
+                              fontWeight: FontWeight.w700,
+                              fontSize: mq.width * 0.035,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    SizedBox(width: mq.width * 0.03),
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () {
+                          Navigator.pop(context);
+                          deleteAccount();
+                        },
+                        child: Container(
+                          height: mq.height * 0.056,
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: const Color(0xffD94C4C),
+                            borderRadius: BorderRadius.circular(40),
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(0xffD94C4C).withOpacity(0.28),
+                                blurRadius: 14,
+                                offset: const Offset(0, 8),
+                              ),
+                            ],
+                          ),
+                          child: Text(
+                            "Yes, Delete",
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontFamily: "Mynor",
+                              fontWeight: FontWeight.w700,
+                              fontSize: mq.width * 0.035,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final mq = MediaQuery.of(context).size;
@@ -290,218 +437,262 @@ class _MorescreenState extends State<Morescreen> {
           )
               : Padding(
             padding: EdgeInsets.symmetric(horizontal: mq.width * 0.07),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                SizedBox(height: mq.height * 0.03),
-                Image.asset(
-                  "assets/images/Logo.png",
-                  height: mq.height * 0.055,
-                  width: mq.width * 0.12,
-                  fit: BoxFit.contain,
-                ),
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SizedBox(height: mq.height * 0.03),
+                  Image.asset(
+                    "assets/images/Logo.png",
+                    height: mq.height * 0.055,
+                    width: mq.width * 0.12,
+                    fit: BoxFit.contain,
+                  ),
 
-                Center(
-                  child: Column(
-                    children: [
-
-                      _buildProfileImage(mq),
-                      Text(
-                        userName,
-                        style: TextStyle(
-                          fontSize: mq.width * 0.055,
-                          fontFamily: "Mynor",
-                          fontWeight: FontWeight.w700,
-                          color: Colors.white,
-                        ),
-                      ),
-                      Text(
-                        userEmail,
-                        style: TextStyle(
-                          fontSize: mq.width * 0.038,
-                          fontFamily: "Mynor",
-                          fontWeight: FontWeight.w500,
-                          color: Colors.white.withOpacity(0.95),
-                        ),
-                      ),
-                      SizedBox(height: mq.height * 0.018),
-                      GestureDetector(
-                        onTap: () async {
-                          await Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) =>
-                              const EditProfileScreen(),
-                            ),
-                          );
-                          await loadUserData();
-                        },
-                        child: Container(
-                          height: mq.height * 0.058,
-                          width: mq.width * 0.40,
-                          decoration: BoxDecoration(
-                            color: const Color(0xff287D80),
-                            borderRadius:
-                            BorderRadius.circular(mq.width * 0.08),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.08),
-                                blurRadius: mq.width * 0.02,
-                                offset: Offset(0, mq.height * 0.004),
-                              ),
-                            ],
+                  // ── Profile Section ──
+                  Center(
+                    child: Column(
+                      children: [
+                        _buildProfileImage(mq),
+                        Text(
+                          userName,
+                          style: TextStyle(
+                            fontSize: mq.width * 0.055,
+                            fontFamily: "Mynor",
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
                           ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.edit,
-                                size: mq.width * 0.05,
-                                color: Colors.white,
+                        ),
+                        Text(
+                          userEmail,
+                          style: TextStyle(
+                            fontSize: mq.width * 0.038,
+                            fontFamily: "Mynor",
+                            fontWeight: FontWeight.w500,
+                            color: Colors.white.withOpacity(0.95),
+                          ),
+                        ),
+                        SizedBox(height: mq.height * 0.018),
+                        GestureDetector(
+                          onTap: () async {
+                            await Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) =>
+                                const EditProfileScreen(),
                               ),
-                              SizedBox(width: mq.width * 0.025),
-                              Text(
-                                "Edit Profile",
-                                style: TextStyle(
-                                  fontSize: mq.width * 0.033,
-                                  fontFamily: "Mynor",
-                                  fontWeight: FontWeight.w600,
+                            );
+                            await loadUserData();
+                          },
+                          child: Container(
+                            height: mq.height * 0.058,
+                            width: mq.width * 0.40,
+                            decoration: BoxDecoration(
+                              color: const Color(0xff287D80),
+                              borderRadius:
+                              BorderRadius.circular(mq.width * 0.08),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.08),
+                                  blurRadius: mq.width * 0.02,
+                                  offset: Offset(0, mq.height * 0.004),
+                                ),
+                              ],
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.edit,
+                                  size: mq.width * 0.05,
                                   color: Colors.white,
                                 ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                SizedBox(height: mq.height * 0.03),
-                GestureDetector(
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) =>
-                        const ChangepasswordScreen(),
-                      ),
-                    );
-                  },
-                  child: Container(
-                    height: mq.height * 0.073,
-                    width: double.infinity,
-                    padding:
-                    EdgeInsets.symmetric(horizontal: mq.width * 0.04),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.06),
-                      borderRadius:
-                      BorderRadius.circular(mq.width * 0.04),
-                      border: Border.all(
-                        color: Colors.white.withOpacity(0.9),
-                        width: mq.width * 0.003,
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          height: mq.height * 0.048,
-                          width: mq.height * 0.048,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: const Color(0xff287D80),
-                              width: mq.width * 0.0025,
+                                SizedBox(width: mq.width * 0.025),
+                                Text(
+                                  "Edit Profile",
+                                  style: TextStyle(
+                                    fontSize: mq.width * 0.033,
+                                    fontFamily: "Mynor",
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
-                          child: Icon(
-                            Icons.lock,
-                            size: mq.width * 0.045,
-                            color: const Color(0xff287D80),
-                          ),
-                        ),
-                        SizedBox(width: mq.width * 0.035),
-                        Expanded(
-                          child: Text(
-                            "Change Password",
-                            style: TextStyle(
-                              fontSize: mq.width * 0.034,
-                              fontFamily: "Mynor",
-                              fontWeight: FontWeight.w500,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ),
-                        Icon(
-                          Icons.chevron_right,
-                          color: const Color(0xff2A9DA0),
-                          size: mq.width * 0.08,
                         ),
                       ],
                     ),
                   ),
-                ),
-                SizedBox(height: mq.height * 0.01),
 
-                GestureDetector(
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => EventsScreen(),
-                      ),
-                    );
-                  },
-                  child: _MoreTile(
-                    mq: mq,
-                    icon: Icons.event_rounded,
-                    title: "Events & Meetings",
-                  ),
-                ),
-                SizedBox(height: mq.height * 0.01),
+                  SizedBox(height: mq.height * 0.03),
 
-                GestureDetector(
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => AIInsightsScreen(),
+                  // ── Change Password ──
+                  GestureDetector(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) =>
+                          const ChangepasswordScreen(),
+                        ),
+                      );
+                    },
+                    child: Container(
+                      height: mq.height * 0.073,
+                      width: double.infinity,
+                      padding: EdgeInsets.symmetric(
+                          horizontal: mq.width * 0.04),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.06),
+                        borderRadius:
+                        BorderRadius.circular(mq.width * 0.04),
+                        border: Border.all(
+                          color: Colors.white.withOpacity(0.9),
+                          width: mq.width * 0.003,
+                        ),
                       ),
-                    );
-                  },
-                  child: _MoreTile(
-                    mq: mq,
-                    icon: Icons. psychology_rounded,
-                    title: "AI Insights",
-                  ),
-                ),
-                SizedBox(height: mq.height * 0.028),
-                GestureDetector(
-                  onTap: showLogoutDialog,
-                  child: Container(
-                    height: mq.height * 0.06,
-                    width: double.infinity,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: Colors.transparent,
-                      borderRadius:
-                      BorderRadius.circular(mq.width * 0.08),
-                      border: Border.all(
-                        color: const Color(0xffD94C4C),
-                        width: mq.width * 0.003,
+                      child: Row(
+                        children: [
+                          Container(
+                            height: mq.height * 0.048,
+                            width: mq.height * 0.048,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: const Color(0xff287D80),
+                                width: mq.width * 0.0025,
+                              ),
+                            ),
+                            child: Icon(
+                              Icons.lock,
+                              size: mq.width * 0.045,
+                              color: const Color(0xff287D80),
+                            ),
+                          ),
+                          SizedBox(width: mq.width * 0.035),
+                          Expanded(
+                            child: Text(
+                              "Change Password",
+                              style: TextStyle(
+                                fontSize: mq.width * 0.034,
+                                fontFamily: "Mynor",
+                                fontWeight: FontWeight.w500,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                          Icon(
+                            Icons.chevron_right,
+                            color: const Color(0xff2A9DA0),
+                            size: mq.width * 0.08,
+                          ),
+                        ],
                       ),
                     ),
-                    child: Text(
-                      "Logout",
-                      style: TextStyle(
-                        fontSize: mq.width * 0.035,
-                        fontWeight: FontWeight.w700,
-                        fontFamily: "Mynor",
-                        color: const Color(0xffD94C4C),
+                  ),
+
+                  SizedBox(height: mq.height * 0.01),
+
+                  // ── Events & Meetings ──
+                  GestureDetector(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => EventsScreen(),
+                        ),
+                      );
+                    },
+                    child: _MoreTile(
+                      mq: mq,
+                      icon: Icons.event_rounded,
+                      title: "Events & Meetings",
+                    ),
+                  ),
+
+                  SizedBox(height: mq.height * 0.01),
+
+                  // ── AI Insights ──
+                  GestureDetector(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => AIInsightsScreen(),
+                        ),
+                      );
+                    },
+                    child: _MoreTile(
+                      mq: mq,
+                      icon: Icons.psychology_rounded,
+                      title: "AI Insights",
+                    ),
+                  ),
+
+                  SizedBox(height: mq.height * 0.028),
+
+                  // ── Logout Button ──
+                  GestureDetector(
+                    onTap: showLogoutDialog,
+                    child: Container(
+                      height: mq.height * 0.06,
+                      width: double.infinity,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: Colors.transparent,
+                        borderRadius:
+                        BorderRadius.circular(mq.width * 0.08),
+                        border: Border.all(
+                          color: const Color(0xffD94C4C),
+                          width: mq.width * 0.003,
+                        ),
+                      ),
+                      child: Text(
+                        "Logout",
+                        style: TextStyle(
+                          fontSize: mq.width * 0.035,
+                          fontWeight: FontWeight.w700,
+                          fontFamily: "Mynor",
+                          color: const Color(0xffD94C4C),
+                        ),
                       ),
                     ),
                   ),
-                ),
-              ],
+
+                  SizedBox(height: mq.height * 0.018),
+
+                  // ── Delete Button ──
+                  GestureDetector(
+                    onTap: showDeleteDialog,
+                    child: Container(
+                      height: mq.height * 0.06,
+                      width: double.infinity,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: Colors.transparent,
+                        borderRadius:
+                        BorderRadius.circular(mq.width * 0.08),
+                        border: Border.all(
+                          color: const Color(0xffD94C4C),
+                          width: mq.width * 0.003,
+                        ),
+                      ),
+                      child: Text(
+                        "Delete Account",
+                        style: TextStyle(
+                          fontSize: mq.width * 0.035,
+                          fontWeight: FontWeight.w700,
+                          fontFamily: "Mynor",
+                          color: const Color(0xffD94C4C),
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  SizedBox(height: mq.height * 0.05),
+                ],
+              ),
             ),
           ),
         ),
@@ -509,6 +700,9 @@ class _MorescreenState extends State<Morescreen> {
     );
   }
 }
+
+// ─── More Tile Widget ─────────────────────────────────────────────────────────
+
 class _MoreTile extends StatelessWidget {
   final Size mq;
   final IconData? icon;
@@ -564,12 +758,10 @@ class _MoreTile extends StatelessWidget {
                   height: mq.height * 0.048,
                 ),
               )
-                  : const SizedBox(), // fallback if both null
+                  : const SizedBox(),
             ),
           ),
-
           SizedBox(width: mq.width * 0.035),
-
           Expanded(
             child: Text(
               title,
@@ -581,7 +773,6 @@ class _MoreTile extends StatelessWidget {
               ),
             ),
           ),
-
           Icon(
             Icons.chevron_right,
             color: const Color(0xff2A9DA0),
