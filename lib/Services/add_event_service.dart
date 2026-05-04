@@ -12,31 +12,43 @@ class AddEventService {
     required String time,
   }) async {
     try {
+      final body = {
+        "team_id": teamId,
+        "title": title,
+        "date": date,
+        "time": time,
+      };
+
       print("Add Event API Calling...");
       print("URL: $_url");
-      print("Body: team_id=$teamId, title=$title, date=$date, time=$time");
+      print("Body: $body");
 
-      final response = await http.post(
+      final response = await http
+          .post(
         Uri.parse(_url),
         headers: {
           "Content-Type": "application/json",
           "Accept": "application/json",
         },
-        body: jsonEncode({
-          "team_id": teamId,
-          "title": title,
-          "date": date,
-          "time": time,
-        }),
-      );
+        body: jsonEncode(body),
+      )
+          .timeout(const Duration(seconds: 15));
 
       print("Status Code: ${response.statusCode}");
       print("Response Body: ${response.body}");
 
-      final data = jsonDecode(response.body);
+      if (response.body.isEmpty) {
+        throw Exception("Empty response from server");
+      }
+
+      final Map<String, dynamic> data = jsonDecode(response.body);
 
       if (response.statusCode == 200 || response.statusCode == 201) {
-        return data;
+        if (data["status"] == 200 || data["status"] == 201) {
+          return data;
+        } else {
+          throw Exception(data["message"] ?? "Failed to add event");
+        }
       } else {
         throw Exception(data["message"] ?? "Failed to add event");
       }

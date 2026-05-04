@@ -15,7 +15,7 @@ class ActiveSprintModel {
     return ActiveSprintModel(
       title: json['title'] ?? '',
       subtitle: json['subtitle'] ?? '',
-      membersLabel: json['members_label'] ?? '',
+      membersLabel: json['members_label'] ?? '+0',
       isActive: json['is_active'] ?? false,
     );
   }

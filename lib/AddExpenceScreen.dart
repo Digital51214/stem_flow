@@ -1,9 +1,11 @@
-import 'dart:convert';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:stemflow/Widgets/backcircle.dart';
 import 'package:stemflow/Widgets/background.dart';
 import 'package:stemflow/services/add_expense_service.dart';
+import 'package:stemflow/Services/session_manager.dart';
+import 'package:stemflow/Services/team_list_service.dart';
+import 'package:stemflow/models/teams_models.dart';
 
 import 'BottomNavigation_screen.dart';
 
@@ -20,7 +22,49 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
   final TextEditingController dateController = TextEditingController();
 
   String selectedCategory = "Materials";
+
   bool isLoading = false;
+  bool isTeamsLoading = false;
+
+  List<MyTeamModel> teams = [];
+  MyTeamModel? selectedTeam;
+
+  final String apiKey = "YOUR_API_KEY_HERE";
+
+  @override
+  void initState() {
+    super.initState();
+    fetchTeams();
+  }
+
+  Future<void> fetchTeams() async {
+    setState(() => isTeamsLoading = true);
+
+    try {
+      final userIdText = await SessionManager.instance.getUserId();
+      final userId = int.tryParse(userIdText) ?? 0;
+
+      final result = await MyTeamService.getMyTeams(
+        userId: userId,
+        apiKey: apiKey,
+      );
+
+      if (!mounted) return;
+
+      setState(() {
+        teams = result;
+        if (teams.isNotEmpty) {
+          selectedTeam = teams.first;
+        }
+      });
+    } catch (e) {
+      showToast("Failed to load teams");
+    } finally {
+      if (mounted) {
+        setState(() => isTeamsLoading = false);
+      }
+    }
+  }
 
   @override
   void dispose() {
@@ -30,14 +74,35 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
     super.dispose();
   }
 
-  // ✅ API CALL HANDLER
+  void showToast(String message, {Color? color}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: color ?? const Color(0xFF287D80),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      ),
+    );
+  }
+
   Future<void> handleAddExpense() async {
-    if (itemNameController.text.isEmpty ||
-        amountController.text.isEmpty ||
-        dateController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Please fill all fields")),
-      );
+    final itemName = itemNameController.text.trim();
+    final amountText = amountController.text.trim();
+    final date = dateController.text.trim();
+    final amount = double.tryParse(amountText);
+
+    if (selectedTeam == null) {
+      showToast("Please select team");
+      return;
+    }
+
+    if (itemName.isEmpty || amountText.isEmpty || date.isEmpty) {
+      showToast("Please fill all fields");
+      return;
+    }
+
+    if (amount == null || amount <= 0) {
+      showToast("Please enter valid amount");
       return;
     }
 
@@ -45,24 +110,22 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
 
     try {
       final result = await ExpenseService.addExpense(
-        teamId: 2,
-        itemName: itemNameController.text,
+        teamId: selectedTeam!.id,
+        itemName: itemName,
         category: selectedCategory,
-        amount: double.tryParse(amountController.text) ?? 0,
-        date: dateController.text,
+        amount: amount,
+        date: date,
       );
 
-      print("✅ SUCCESS: ${result["message"]}");
-      print("💰 New Balance: ${result["data"]["new_balance"]}");
+      showToast(result["message"] ?? "Expense saved successfully");
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text("Saved! Expense"),
-          backgroundColor: Color(0xFF287D80),
-        ),
-      );
+      itemNameController.clear();
+      amountController.clear();
+      dateController.clear();
 
       await Future.delayed(const Duration(milliseconds: 500));
+
+      if (!mounted) return;
 
       Navigator.pushAndRemoveUntil(
         context,
@@ -70,17 +133,12 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
             (route) => false,
       );
     } catch (e) {
-      print("❌ ERROR: $e");
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(e.toString()),
-          backgroundColor: Colors.red,
-        ),
-      );
+      showToast(e.toString(), color: Colors.red);
+    } finally {
+      if (mounted) {
+        setState(() => isLoading = false);
+      }
     }
-
-    setState(() => isLoading = false);
   }
 
   @override
@@ -105,7 +163,6 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                 ),
               ),
             ),
-
             SafeArea(
               child: SingleChildScrollView(
                 padding: EdgeInsets.symmetric(horizontal: mq.width * 0.055),
@@ -113,7 +170,6 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     SizedBox(height: mq.height * 0.045),
-
                     Row(
                       children: [
                         BackCircle(onTap: () => Navigator.pop(context)),
@@ -129,9 +185,7 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                         ),
                       ],
                     ),
-
                     SizedBox(height: mq.height * 0.03),
-
                     Text(
                       "Add Expense",
                       style: TextStyle(
@@ -141,9 +195,7 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                         fontWeight: FontWeight.w900,
                       ),
                     ),
-
                     SizedBox(height: mq.height * 0.03),
-
                     _GlassFormCard(
                       mq: mq,
                       child: Padding(
@@ -154,6 +206,21 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
+                            _FieldLabel(mq: mq, title: "TEAM"),
+                            SizedBox(height: mq.height * 0.012),
+                            _TeamDropdown(
+                              mq: mq,
+                              teams: teams,
+                              selectedTeam: selectedTeam,
+                              isLoading: isTeamsLoading,
+                              onChanged: (team) {
+                                if (team == null) return;
+                                setState(() => selectedTeam = team);
+                              },
+                            ),
+
+                            SizedBox(height: mq.height * 0.024),
+
                             _FieldLabel(mq: mq, title: "ITEM NAME"),
                             SizedBox(height: mq.height * 0.012),
                             _ExpenseTextField(
@@ -162,11 +229,10 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                               hintText: "e.g. Aerodynamic Carbon Sheet",
                             ),
 
-                            SizedBox(height: mq.height * 0.028),
+                            SizedBox(height: mq.height * 0.024),
 
                             _FieldLabel(mq: mq, title: "CATEGORY"),
                             SizedBox(height: mq.height * 0.012),
-
                             _CategoryDropdown(
                               mq: mq,
                               value: selectedCategory,
@@ -177,11 +243,10 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                               },
                             ),
 
-                            SizedBox(height: mq.height * 0.026),
+                            SizedBox(height: mq.height * 0.024),
 
                             _FieldLabel(mq: mq, title: "AMOUNT"),
                             SizedBox(height: mq.height * 0.012),
-
                             _ExpenseTextField(
                               mq: mq,
                               controller: amountController,
@@ -189,14 +254,14 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                               prefixText: "\$ ",
                               keyboardType:
                               const TextInputType.numberWithOptions(
-                                  decimal: true),
+                                decimal: true,
+                              ),
                             ),
 
-                            SizedBox(height: mq.height * 0.026),
+                            SizedBox(height: mq.height * 0.024),
 
                             _FieldLabel(mq: mq, title: "DATE"),
                             SizedBox(height: mq.height * 0.012),
-
                             _ExpenseTextField(
                               mq: mq,
                               controller: dateController,
@@ -212,7 +277,6 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                                 );
 
                                 if (pickedDate != null) {
-                                  // ✅ FIXED FORMAT
                                   dateController.text =
                                   "${pickedDate.year}-${pickedDate.month.toString().padLeft(2, '0')}-${pickedDate.day.toString().padLeft(2, '0')}";
                                 }
@@ -222,21 +286,17 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                         ),
                       ),
                     ),
-
                     SizedBox(height: mq.height * 0.038),
-
                     _SaveExpenseButton(
                       mq: mq,
-                      onTap: handleAddExpense,
+                      onTap: isLoading ? null : handleAddExpense,
+                      isLoading: isLoading,
                     ),
-
                     SizedBox(height: mq.height * 0.08),
                   ],
                 ),
               ),
             ),
-
-            // ✅ LOADER
             if (isLoading)
               Container(
                 color: Colors.black.withOpacity(0.4),
@@ -245,6 +305,87 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                 ),
               ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _TeamDropdown extends StatelessWidget {
+  final Size mq;
+  final List<MyTeamModel> teams;
+  final MyTeamModel? selectedTeam;
+  final bool isLoading;
+  final ValueChanged<MyTeamModel?> onChanged;
+
+  const _TeamDropdown({
+    required this.mq,
+    required this.teams,
+    required this.selectedTeam,
+    required this.isLoading,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: mq.height * 0.058,
+      child: DropdownButtonFormField<MyTeamModel>(
+        value: selectedTeam,
+        isExpanded: true,
+        dropdownColor: const Color(0xFF4EB7BD),
+        icon: Icon(
+          Icons.keyboard_arrow_down_rounded,
+          color: Colors.white,
+          size: mq.width * 0.065,
+        ),
+        items: teams.map((team) {
+          return DropdownMenuItem<MyTeamModel>(
+            value: team,
+            child: Text(
+              team.name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: mq.width * 0.03,
+                fontFamily: "Mynor",
+                fontWeight: FontWeight.w400,
+              ),
+            ),
+          );
+        }).toList(),
+        onChanged: isLoading ? null : onChanged,
+        hint: Text(
+          isLoading ? "Loading teams..." : "Select Team",
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: mq.width * 0.03,
+            fontFamily: "Mynor",
+            fontWeight: FontWeight.w400,
+          ),
+        ),
+        decoration: InputDecoration(
+          contentPadding: EdgeInsets.symmetric(
+            horizontal: mq.width * 0.05,
+            vertical: mq.height * 0.012,
+          ),
+          filled: true,
+          fillColor: Colors.white.withOpacity(0.05),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(mq.width * 0.08),
+            borderSide: BorderSide(
+              color: Colors.white.withOpacity(0.65),
+              width: 1,
+            ),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(mq.width * 0.08),
+            borderSide: BorderSide(
+              color: Colors.white.withOpacity(0.9),
+              width: 1,
+            ),
+          ),
         ),
       ),
     );
@@ -316,7 +457,7 @@ class _ExpenseTextField extends StatelessWidget {
           hintText: hintText,
           prefixText: prefixText,
           prefixStyle: TextStyle(
-            color: Colors.black,
+            color: Colors.white,
             fontSize: mq.width * 0.026,
             fontFamily: "Mynor",
             fontWeight: FontWeight.w400,
@@ -412,22 +553,10 @@ class _CategoryDropdown extends StatelessWidget {
           ),
         ),
         items: const [
-          DropdownMenuItem(
-            value: "Materials",
-            child: Text("Materials"),
-          ),
-          DropdownMenuItem(
-            value: "Manufacturing",
-            child: Text("Manufacturing"),
-          ),
-          DropdownMenuItem(
-            value: "Electronics",
-            child: Text("Electronics"),
-          ),
-          DropdownMenuItem(
-            value: "Tools",
-            child: Text("Tools"),
-          ),
+          DropdownMenuItem(value: "Materials", child: Text("Materials")),
+          DropdownMenuItem(value: "Manufacturing", child: Text("Manufacturing")),
+          DropdownMenuItem(value: "Electronics", child: Text("Electronics")),
+          DropdownMenuItem(value: "Tools", child: Text("Tools")),
         ],
         onChanged: onChanged,
       ),
@@ -437,11 +566,13 @@ class _CategoryDropdown extends StatelessWidget {
 
 class _SaveExpenseButton extends StatelessWidget {
   final Size mq;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
+  final bool isLoading;
 
   const _SaveExpenseButton({
     required this.mq,
     required this.onTap,
+    required this.isLoading,
   });
 
   @override
@@ -450,7 +581,9 @@ class _SaveExpenseButton extends StatelessWidget {
       height: mq.height * 0.058,
       width: double.infinity,
       decoration: BoxDecoration(
-        color: const Color(0xFF287D80),
+        color: onTap == null
+            ? const Color(0xFF287D80).withOpacity(0.55)
+            : const Color(0xFF287D80),
         borderRadius: BorderRadius.circular(mq.width * 0.09),
         boxShadow: [
           BoxShadow(
@@ -463,25 +596,36 @@ class _SaveExpenseButton extends StatelessWidget {
       child: InkWell(
         borderRadius: BorderRadius.circular(mq.width * 0.09),
         onTap: onTap,
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.save_outlined,
+        child: Center(
+          child: isLoading
+              ? SizedBox(
+            height: mq.width * 0.05,
+            width: mq.width * 0.05,
+            child: const CircularProgressIndicator(
               color: Colors.white,
-              size: mq.width * 0.04,
+              strokeWidth: 2,
             ),
-            SizedBox(width: mq.width * 0.018),
-            Text(
-              "Save Expense",
-              style: TextStyle(
+          )
+              : Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.save_outlined,
                 color: Colors.white,
-                fontSize: mq.width * 0.038,
-                fontFamily: "Mynor",
-                fontWeight: FontWeight.w900,
+                size: mq.width * 0.04,
               ),
-            ),
-          ],
+              SizedBox(width: mq.width * 0.018),
+              Text(
+                "Save Expense",
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: mq.width * 0.038,
+                  fontFamily: "Mynor",
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -507,7 +651,7 @@ class _GlassFormCard extends StatelessWidget {
           sigmaY: 10,
         ),
         child: Container(
-          height: mq.height*0.53,
+          height: mq.height * 0.64,
           width: double.infinity,
           decoration: BoxDecoration(
             color: const Color(0xFF4EB7BD).withOpacity(0.48),

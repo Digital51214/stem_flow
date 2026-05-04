@@ -6,7 +6,10 @@ import 'package:stemflow/Widgets/backcircle.dart';
 import 'package:stemflow/Widgets/background.dart';
 
 import 'Services/show_team_events.dart';
+import 'Services/session_manager.dart';
+import 'Services/team_list_service.dart';
 import 'models/team_event_model.dart';
+import 'models/teams_models.dart';
 
 class EventsScreen extends StatefulWidget {
   const EventsScreen({super.key});
@@ -17,42 +20,75 @@ class EventsScreen extends StatefulWidget {
 
 class _EventsScreenState extends State<EventsScreen> {
   bool isLoading = false;
+  bool isTeamsLoading = false;
+
   TeamEventsModel? teamEvents;
   Timer? refreshTimer;
 
-  final int teamId = 1;
+  List<MyTeamModel> teams = [];
+  MyTeamModel? selectedTeam;
+
   final String apiKey = 'YOUR_API_KEY_HERE';
 
   @override
   void initState() {
     super.initState();
-    fetchTeamEvents();
+    fetchTeams();
 
     refreshTimer = Timer.periodic(const Duration(seconds: 10), (timer) {
-      print('Auto refreshing team events...');
-      fetchTeamEvents(showLoader: false);
+      if (selectedTeam != null) {
+        fetchTeamEvents(showLoader: false);
+      }
     });
   }
 
-  Future<void> fetchTeamEvents({bool showLoader = true}) async {
+  Future<void> fetchTeams() async {
     if (!mounted) return;
 
-    if (showLoader) {
-      setState(() {
-        isLoading = true;
-      });
-    }
+    setState(() => isTeamsLoading = true);
 
     try {
-      print('Fetching team events...');
+      final userIdText = await SessionManager.instance.getUserId();
+      final userId = int.tryParse(userIdText) ?? 0;
 
-      final result = await ShowTeamEventService.getTeamEvents(
-        teamId: teamId,
+      final result = await MyTeamService.getMyTeams(
+        userId: userId,
         apiKey: apiKey,
       );
 
-      print('Team events updated on screen');
-      print('Upcoming Events Count: ${result.upcomingSchedule.length}');
+      if (!mounted) return;
+
+      setState(() {
+        teams = result;
+        if (teams.isNotEmpty) {
+          selectedTeam = teams.first;
+        }
+      });
+
+      if (selectedTeam != null) {
+        fetchTeamEvents();
+      }
+    } catch (e) {
+      showToast('Failed to load teams');
+    } finally {
+      if (mounted) {
+        setState(() => isTeamsLoading = false);
+      }
+    }
+  }
+
+  Future<void> fetchTeamEvents({bool showLoader = true}) async {
+    if (!mounted || selectedTeam == null) return;
+
+    if (showLoader) {
+      setState(() => isLoading = true);
+    }
+
+    try {
+      final result = await ShowTeamEventService.getTeamEvents(
+        teamId: selectedTeam!.id,
+        apiKey: apiKey,
+      );
 
       if (!mounted) return;
 
@@ -60,16 +96,12 @@ class _EventsScreenState extends State<EventsScreen> {
         teamEvents = result;
       });
     } catch (e) {
-      print('Fetch Team Events Error: $e');
-
       if (mounted) {
         showToast('Failed to load team events');
       }
     } finally {
       if (mounted && showLoader) {
-        setState(() {
-          isLoading = false;
-        });
+        setState(() => isLoading = false);
       }
     }
   }
@@ -77,15 +109,10 @@ class _EventsScreenState extends State<EventsScreen> {
   void showToast(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(
-          message,
-          style: const TextStyle(color: Colors.white),
-        ),
+        content: Text(message, style: const TextStyle(color: Colors.white)),
         backgroundColor: const Color(0xFF287D80),
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(14),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       ),
     );
   }
@@ -98,10 +125,7 @@ class _EventsScreenState extends State<EventsScreen> {
       ),
     );
 
-    print('Returned from Add Event Screen: $isAdded');
-
     if (isAdded == true) {
-      print('Refreshing upcoming schedule...');
       fetchTeamEvents(showLoader: false);
     }
   }
@@ -136,7 +160,6 @@ class _EventsScreenState extends State<EventsScreen> {
                 ),
               ),
             ),
-
             SafeArea(
               child: RefreshIndicator(
                 color: const Color(0xFF287D80),
@@ -148,7 +171,6 @@ class _EventsScreenState extends State<EventsScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       SizedBox(height: mq.height * 0.045),
-
                       Row(
                         children: [
                           BackCircle(onTap: () => Navigator.pop(context)),
@@ -165,22 +187,44 @@ class _EventsScreenState extends State<EventsScreen> {
                           ),
                         ],
                       ),
-
                       SizedBox(height: mq.height * 0.03),
 
-                      Text(
-                        "Events & Meetings",
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: mq.width * 0.05,
-                          fontFamily: "Mynor",
-                          fontWeight: FontWeight.w900,
-                        ),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              "Events & Meetings",
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: mq.width * 0.05,
+                                fontFamily: "Mynor",
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                          ),
+                          SizedBox(width: mq.width * 0.03),
+                          _TeamsDropdown(
+                            mq: mq,
+                            teams: teams,
+                            selectedTeam: selectedTeam,
+                            isLoading: isTeamsLoading,
+                            onChanged: (team) {
+                              if (team == null) return;
+
+                              setState(() {
+                                selectedTeam = team;
+                                teamEvents = null;
+                              });
+
+                              fetchTeamEvents();
+                            },
+                          ),
+                        ],
                       ),
 
                       SizedBox(height: mq.height * 0.02),
 
-                      if (isLoading)
+                      if (isLoading || isTeamsLoading)
                         SizedBox(
                           height: mq.height * 0.45,
                           child: const Center(
@@ -189,142 +233,151 @@ class _EventsScreenState extends State<EventsScreen> {
                             ),
                           ),
                         )
-                      else ...[
-                        _GlassCard(
-                          mq: mq,
-                          height: mq.height * 0.16,
-                          child: Padding(
-                            padding: EdgeInsets.symmetric(
-                              vertical: mq.width * 0.03,
-                              horizontal: mq.width * 0.045,
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  activeSprint?.title ?? "No Active Sprint",
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: mq.width * 0.042,
-                                    fontWeight: FontWeight.w900,
-                                  ),
-                                ),
-                                SizedBox(height: mq.height * 0.006),
-                                Text(
-                                  activeSprint?.subtitle ?? "",
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: mq.width * 0.028,
-                                  ),
-                                ),
-                                SizedBox(height: mq.height * 0.02),
-                                Padding(
-                                  padding:
-                                  EdgeInsets.only(left: mq.width * 0.012),
-                                  child: SizedBox(
-                                    height: mq.width * 0.09,
-                                    width: mq.width * 0.30,
-                                    child: Stack(
-                                      clipBehavior: Clip.none,
-                                      children: [
-                                        Positioned(
-                                          left: 0,
-                                          child: _Avatar(
-                                            mq,
-                                            "assets/images/member1.png",
-                                          ),
-                                        ),
-                                        Positioned(
-                                          left: mq.width * 0.055,
-                                          child: _Avatar(
-                                            mq,
-                                            "assets/images/member2.png",
-                                          ),
-                                        ),
-                                        Positioned(
-                                          left: mq.width * 0.110,
-                                          child: _Avatar(
-                                            mq,
-                                            "assets/images/member3.png",
-                                          ),
-                                        ),
-                                        Positioned(
-                                          left: mq.width * 0.165,
-                                          child: Container(
-                                            height: mq.width * 0.09,
-                                            width: mq.width * 0.09,
-                                            alignment: Alignment.center,
-                                            decoration: BoxDecoration(
-                                              color: Colors.white,
-                                              borderRadius:
-                                              BorderRadius.circular(
-                                                mq.width * 0.03,
-                                              ),
-                                            ),
-                                            child: Text(
-                                              activeSprint?.membersLabel ??
-                                                  "+0",
-                                              style: TextStyle(
-                                                color:
-                                                const Color(0xFF287D80),
-                                                fontWeight: FontWeight.w900,
-                                                fontSize: mq.width * 0.028,
-                                              ),
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-
-                        SizedBox(height: mq.height * 0.018),
-
-                        Text(
-                          "Upcoming Schedule",
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: mq.width * 0.032,
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
-
-                        SizedBox(height: mq.height * 0.012),
-
-                        if (upcomingSchedule.isEmpty)
-                          SizedBox(
-                            height: mq.height * 0.18,
-                            child: const Center(
-                              child: Text(
-                                "No upcoming events found",
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w700,
-                                ),
+                      else if (selectedTeam == null)
+                        SizedBox(
+                          height: mq.height * 0.45,
+                          child: const Center(
+                            child: Text(
+                              "No teams found",
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w700,
                               ),
                             ),
-                          )
-                        else
-                          ListView.builder(
-                            shrinkWrap: true,
-                            physics: const NeverScrollableScrollPhysics(),
-                            itemCount: upcomingSchedule.length,
-                            itemBuilder: (context, index) {
-                              final event = upcomingSchedule[index];
-
-                              return _EventCard(
-                                mq,
-                                title: event.title,
-                                date: event.date,
-                                time: event.time,
-                              );
-                            },
                           ),
-                      ],
+                        )
+                      else ...[
+                          _GlassCard(
+                            mq: mq,
+                            height: mq.height * 0.16,
+                            child: Padding(
+                              padding: EdgeInsets.symmetric(
+                                vertical: mq.width * 0.03,
+                                horizontal: mq.width * 0.045,
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    activeSprint?.title ?? "No Active Sprint",
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: mq.width * 0.042,
+                                      fontWeight: FontWeight.w900,
+                                    ),
+                                  ),
+                                  SizedBox(height: mq.height * 0.006),
+                                  Text(
+                                    activeSprint?.subtitle ?? "",
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: mq.width * 0.028,
+                                    ),
+                                  ),
+                                  SizedBox(height: mq.height * 0.02),
+                                  Padding(
+                                    padding: EdgeInsets.only(
+                                      left: mq.width * 0.012,
+                                    ),
+                                    child: SizedBox(
+                                      height: mq.width * 0.09,
+                                      width: mq.width * 0.30,
+                                      child: Stack(
+                                        clipBehavior: Clip.none,
+                                        children: [
+                                          Positioned(
+                                            left: 0,
+                                            child: _Avatar(
+                                              mq,
+                                              "assets/images/member1.png",
+                                            ),
+                                          ),
+                                          Positioned(
+                                            left: mq.width * 0.055,
+                                            child: _Avatar(
+                                              mq,
+                                              "assets/images/member2.png",
+                                            ),
+                                          ),
+                                          Positioned(
+                                            left: mq.width * 0.110,
+                                            child: _Avatar(
+                                              mq,
+                                              "assets/images/member3.png",
+                                            ),
+                                          ),
+                                          Positioned(
+                                            left: mq.width * 0.165,
+                                            child: Container(
+                                              height: mq.width * 0.09,
+                                              width: mq.width * 0.09,
+                                              alignment: Alignment.center,
+                                              decoration: BoxDecoration(
+                                                color: Colors.white,
+                                                borderRadius:
+                                                BorderRadius.circular(
+                                                  mq.width * 0.03,
+                                                ),
+                                              ),
+                                              child: Text(
+                                                activeSprint?.membersLabel ??
+                                                    "+0",
+                                                style: TextStyle(
+                                                  color: const Color(0xFF287D80),
+                                                  fontWeight: FontWeight.w900,
+                                                  fontSize: mq.width * 0.028,
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          SizedBox(height: mq.height * 0.018),
+                          Text(
+                            "Upcoming Schedule",
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: mq.width * 0.032,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                          SizedBox(height: mq.height * 0.012),
+                          if (upcomingSchedule.isEmpty)
+                            SizedBox(
+                              height: mq.height * 0.18,
+                              child: const Center(
+                                child: Text(
+                                  "No upcoming events found",
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                            )
+                          else
+                            ListView.builder(
+                              shrinkWrap: true,
+                              physics: const NeverScrollableScrollPhysics(),
+                              itemCount: upcomingSchedule.length,
+                              itemBuilder: (context, index) {
+                                final event = upcomingSchedule[index];
+
+                                return _EventCard(
+                                  mq,
+                                  title: event.title,
+                                  date: event.date,
+                                  time: event.time,
+                                );
+                              },
+                            ),
+                        ],
 
                       SizedBox(height: mq.height * 0.025),
 
@@ -335,8 +388,9 @@ class _EventsScreenState extends State<EventsScreen> {
                           width: double.infinity,
                           decoration: BoxDecoration(
                             color: const Color(0xFF287D80),
-                            borderRadius:
-                            BorderRadius.circular(mq.width * 0.09),
+                            borderRadius: BorderRadius.circular(
+                              mq.width * 0.09,
+                            ),
                           ),
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.center,
@@ -385,6 +439,90 @@ class _EventsScreenState extends State<EventsScreen> {
         image: DecorationImage(
           image: AssetImage(image),
           fit: BoxFit.cover,
+        ),
+      ),
+    );
+  }
+}
+
+class _TeamsDropdown extends StatelessWidget {
+  final Size mq;
+  final List<MyTeamModel> teams;
+  final MyTeamModel? selectedTeam;
+  final bool isLoading;
+  final ValueChanged<MyTeamModel?> onChanged;
+
+  const _TeamsDropdown({
+    required this.mq,
+    required this.teams,
+    required this.selectedTeam,
+    required this.isLoading,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: mq.height * 0.046,
+      width: mq.width * 0.34,
+      child: DropdownButtonFormField<MyTeamModel>(
+        value: selectedTeam,
+        isExpanded: true,
+        dropdownColor: const Color(0xFF287D80),
+        icon: Icon(
+          Icons.keyboard_arrow_down_rounded,
+          color: Colors.white,
+          size: mq.width * 0.045,
+        ),
+        items: teams.map((team) {
+          return DropdownMenuItem<MyTeamModel>(
+            value: team,
+            child: Text(
+              team.name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: mq.width * 0.027,
+                fontFamily: "Mynor",
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          );
+        }).toList(),
+        onChanged: isLoading ? null : onChanged,
+        hint: Text(
+          isLoading ? "Loading..." : "Teams",
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: mq.width * 0.027,
+            fontFamily: "Mynor",
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        decoration: InputDecoration(
+          contentPadding: EdgeInsets.symmetric(
+            horizontal: mq.width * 0.035,
+            vertical: 0,
+          ),
+          filled: true,
+          fillColor: const Color(0xFF4EB7BD).withOpacity(0.48),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(mq.width * 0.08),
+            borderSide: BorderSide(
+              color: Colors.white.withOpacity(0.65),
+              width: 1,
+            ),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(mq.width * 0.08),
+            borderSide: BorderSide(
+              color: Colors.white.withOpacity(0.9),
+              width: 1,
+            ),
+          ),
         ),
       ),
     );

@@ -1,15 +1,13 @@
-import 'dart:convert';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:stemflow/Widgets/backcircle.dart';
 import 'package:stemflow/Widgets/background.dart';
 import 'package:stemflow/services/budget_service.dart';
-
-import 'package:stemflow/models/project_model.dart';
-import 'package:stemflow/services/session_manager.dart';
+import 'package:stemflow/Services/session_manager.dart';
+import 'package:stemflow/Services/team_list_service.dart';
+import 'package:stemflow/models/teams_models.dart';
 
 import 'AddExpenceScreen.dart';
-import 'Services/show_project_list.dart'; // Ensure this is imported
 
 class BudgetScreen extends StatefulWidget {
   const BudgetScreen({super.key});
@@ -20,79 +18,91 @@ class BudgetScreen extends StatefulWidget {
 
 class _BudgetScreenState extends State<BudgetScreen> {
   bool isLoading = false;
+  bool isTeamsLoading = false;
+
+  List<MyTeamModel> teams = [];
+  MyTeamModel? selectedTeam;
+
+  Map<String, dynamic>? budgetSummary;
+  List allocations = [];
   List expenseLog = [];
-  List<ProjectModel> _projects = [];  // List to store projects
-  ProjectModel? _selectedProject;  // The selected project
+
+  final String apiKey = "YOUR_API_KEY_HERE";
 
   @override
   void initState() {
     super.initState();
-    fetchProjects();  // Fetch all projects
+    fetchTeams();
   }
 
-  Future<void> fetchProjects() async {
-    setState(() => isLoading = true);
+  Future<void> fetchTeams() async {
+    setState(() => isTeamsLoading = true);
 
     try {
-      final userId = await SessionManager.instance.getUserId();
-      final result = await ShowProjectService.getUserProjects(
-        userId: int.parse(userId),  // Convert userId to int here if it's a String
-        apiKey: 'YOUR_API_KEY',
+      final userIdText = await SessionManager.instance.getUserId();
+      final userId = int.tryParse(userIdText) ?? 0;
+
+      final result = await MyTeamService.getMyTeams(
+        userId: userId,
+        apiKey: apiKey,
       );
 
+      if (!mounted) return;
+
       setState(() {
-        _projects = result;  // Store projects
-        if (_projects.isNotEmpty) {
-          _selectedProject = _projects.first;  // Automatically select the first project
+        teams = result;
+        if (teams.isNotEmpty) {
+          selectedTeam = teams.first;
         }
       });
 
-      // Fetch the budget details for the selected project
-      if (_selectedProject != null) {
-        await fetchBudgetDetails(_selectedProject!.id);
+      if (selectedTeam != null) {
+        await fetchBudgetDetails();
       }
     } catch (e) {
-      print("❌ PROJECT API ERROR: $e");
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to load projects')),
-      );
+      showToast("Failed to load teams", color: Colors.red);
+    } finally {
+      if (mounted) {
+        setState(() => isTeamsLoading = false);
+      }
     }
-
-    setState(() => isLoading = false);
   }
 
-  Future<void> fetchBudgetDetails(int projectId) async {
+  Future<void> fetchBudgetDetails() async {
+    if (selectedTeam == null) return;
+
     setState(() => isLoading = true);
 
     try {
-      final result = await BudgetService.getBudgetDetails(teamId: 2);  // Modify this if needed
+      final result = await BudgetService.getBudgetDetails(
+        teamId: selectedTeam!.id,
+      );
+
+      if (!mounted) return;
 
       setState(() {
+        budgetSummary = result["budget_summary"] ?? {};
+        allocations = result["allocations"] ?? [];
         expenseLog = result["expense_log"] ?? [];
       });
     } catch (e) {
-      print("❌ BUDGET API ERROR: $e");
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(e.toString()),
-          backgroundColor: Colors.red,
-        ),
-      );
+      showToast(e.toString(), color: Colors.red);
+    } finally {
+      if (mounted) {
+        setState(() => isLoading = false);
+      }
     }
-
-    setState(() => isLoading = false);
   }
 
-  double getTotalSpend() {
-    double total = 0;
-
-    for (final item in expenseLog) {
-      final amountText = item["amount"].toString().replaceAll("\$", "").replaceAll(",", "");
-      total += double.tryParse(amountText) ?? 0;
-    }
-
-    return total;
+  void showToast(String message, {Color? color}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: color ?? const Color(0xFF287D80),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      ),
+    );
   }
 
   IconData getExpenseIcon(String category) {
@@ -110,10 +120,22 @@ class _BudgetScreenState extends State<BudgetScreen> {
     }
   }
 
+  double getProgressValue() {
+    final raw = budgetSummary?["raw_percentage"] ?? 0;
+    final value = double.tryParse(raw.toString()) ?? 0;
+    return (value / 100).clamp(0.0, 1.0);
+  }
+
   @override
   Widget build(BuildContext context) {
     final mq = MediaQuery.of(context).size;
-    final totalSpend = getTotalSpend();
+
+    final totalSpend = budgetSummary?["total_spend"] ?? "\$0.00";
+    final totalBudget = budgetSummary?["total_budget"] ?? "\$0.00";
+    final remaining = budgetSummary?["remaining"] ?? "\$0.00";
+    final usagePercentage = budgetSummary?["usage_percentage"] ?? "0% of goal";
+    final utilizedLabel =
+        budgetSummary?["utilized_label"] ?? "0% Budget Utilized";
 
     return Scaffold(
       body: Bg(
@@ -135,17 +157,16 @@ class _BudgetScreenState extends State<BudgetScreen> {
             ),
             SafeArea(
               child: RefreshIndicator(
-                onRefresh: () async {
-                  if (_selectedProject != null) {
-                    await fetchBudgetDetails(_selectedProject!.id);
-                  }
-                },
+                color: const Color(0xFF287D80),
+                onRefresh: fetchBudgetDetails,
                 child: SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
                   padding: EdgeInsets.symmetric(horizontal: mq.width * 0.055),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       SizedBox(height: mq.height * 0.045),
+
                       Row(
                         children: [
                           BackCircle(onTap: () => Navigator.pop(context)),
@@ -165,114 +186,165 @@ class _BudgetScreenState extends State<BudgetScreen> {
 
                       SizedBox(height: mq.height * 0.03),
 
-                      Text(
-                        "Budget",
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: mq.width * 0.05,
-                          fontFamily: "Mynor",
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-
-                      SizedBox(height: mq.height * 0.02),
-
-                      // Project Dropdown
-                      if (_projects.isNotEmpty)
-                        DropdownButton<ProjectModel>(
-                          value: _selectedProject,
-                          hint: Text("Select Project"),
-                          items: _projects.map((project) {
-                            return DropdownMenuItem<ProjectModel>(
-                              value: project,
-                              child: Text(project.projectName),
-                            );
-                          }).toList(),
-                          onChanged: (ProjectModel? selectedProject) {
-                            setState(() {
-                              _selectedProject = selectedProject;
-                              // Fetch budget details for the selected project
-                              if (_selectedProject != null) {
-                                fetchBudgetDetails(_selectedProject!.id);
-                              }
-                            });
-                          },
-                        ),
-
-                      SizedBox(height: mq.height * 0.02),
-
-                      _TotalSpendCard(
-                        mq: mq,
-                        totalSpend: "\$${totalSpend.toStringAsFixed(2)}",
-                      ),
-
-                      SizedBox(height: mq.height * 0.022),
-
-                      Text(
-                        "Expense Log",
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: mq.width * 0.035,
-                          fontFamily: "Mynor",
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-
-                      SizedBox(height: mq.height * 0.012),
-
-                      if (!isLoading && expenseLog.isEmpty)
-                        Padding(
-                          padding: EdgeInsets.only(top: mq.height * 0.04),
-                          child: Center(
+                      Row(
+                        children: [
+                          Expanded(
                             child: Text(
-                              "No expenses found",
+                              "Budget",
                               style: TextStyle(
                                 color: Colors.white,
-                                fontSize: mq.width * 0.035,
+                                fontSize: mq.width * 0.05,
                                 fontFamily: "Mynor",
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                          ),
+                          SizedBox(width: mq.width * 0.03),
+                          _TeamDropdown(
+                            mq: mq,
+                            teams: teams,
+                            selectedTeam: selectedTeam,
+                            isLoading: isTeamsLoading,
+                            onChanged: (team) {
+                              if (team == null) return;
+
+                              setState(() {
+                                selectedTeam = team;
+                                budgetSummary = null;
+                                allocations = [];
+                                expenseLog = [];
+                              });
+
+                              fetchBudgetDetails();
+                            },
+                          ),
+                        ],
+                      ),
+
+                      SizedBox(height: mq.height * 0.02),
+
+                      if (selectedTeam == null && !isTeamsLoading)
+                        SizedBox(
+                          height: mq.height * 0.35,
+                          child: const Center(
+                            child: Text(
+                              "No teams found",
+                              style: TextStyle(
+                                color: Colors.white,
                                 fontWeight: FontWeight.w700,
                               ),
                             ),
                           ),
+                        )
+                      else ...[
+                        _TotalSpendCard(
+                          mq: mq,
+                          totalSpend: totalSpend,
+                          totalBudget: totalBudget,
+                          remaining: remaining,
+                          usagePercentage: usagePercentage,
+                          utilizedLabel: utilizedLabel,
+                          progressValue: getProgressValue(),
                         ),
 
-                      ListView.separated(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        itemCount: expenseLog.length,
-                        separatorBuilder: (context, index) {
-                          return SizedBox(height: mq.height * 0.01);
-                        },
-                        itemBuilder: (context, index) {
-                          final expense = expenseLog[index];
-                          return _ExpenseCard(
-                            mq: mq,
-                            icon: getExpenseIcon(expense["category"] ?? ""),
-                            title: expense["item_name"] ?? "",
-                            category: expense["category"] ?? "",
-                            price: expense["amount"] ?? "",
-                            date: expense["date"] ?? "",
-                          );
-                        },
-                      ),
+                        SizedBox(height: mq.height * 0.022),
 
-                      SizedBox(height: mq.height * 0.028),
-
-                      _AddExpenseButton(
-                        mq: mq,
-                        onTap: () async {
-                          await Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const AddExpenseScreen(),
+                        if (allocations.isNotEmpty) ...[
+                          Text(
+                            "Allocations",
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: mq.width * 0.035,
+                              fontFamily: "Mynor",
+                              fontWeight: FontWeight.w900,
                             ),
-                          );
+                          ),
+                          SizedBox(height: mq.height * 0.012),
+                          ListView.separated(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            itemCount: allocations.length,
+                            separatorBuilder: (_, __) =>
+                                SizedBox(height: mq.height * 0.01),
+                            itemBuilder: (context, index) {
+                              final item = allocations[index];
 
-                          if (_selectedProject != null) {
-                            fetchBudgetDetails(_selectedProject!.id);
-                          }
-                        },
-                      ),
+                              return _AllocationCard(
+                                mq: mq,
+                                category: item["category"] ?? "",
+                                spent: item["spent"] ?? "\$0.00",
+                                percentage: item["percentage"] ?? 0,
+                                icon: getExpenseIcon(item["category"] ?? ""),
+                              );
+                            },
+                          ),
+                          SizedBox(height: mq.height * 0.022),
+                        ],
+
+                        Text(
+                          "Expense Log",
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: mq.width * 0.035,
+                            fontFamily: "Mynor",
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+
+                        SizedBox(height: mq.height * 0.012),
+
+                        if (!isLoading && expenseLog.isEmpty)
+                          Padding(
+                            padding: EdgeInsets.only(top: mq.height * 0.04),
+                            child: Center(
+                              child: Text(
+                                "No expenses found",
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: mq.width * 0.035,
+                                  fontFamily: "Mynor",
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                          ),
+
+                        ListView.separated(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          itemCount: expenseLog.length,
+                          separatorBuilder: (_, __) =>
+                              SizedBox(height: mq.height * 0.01),
+                          itemBuilder: (context, index) {
+                            final expense = expenseLog[index];
+
+                            return _ExpenseCard(
+                              mq: mq,
+                              icon: getExpenseIcon(expense["category"] ?? ""),
+                              title: expense["item_name"] ?? "",
+                              category: expense["category"] ?? "",
+                              price: expense["amount"] ?? "",
+                              date: expense["date"] ?? "",
+                            );
+                          },
+                        ),
+
+                        SizedBox(height: mq.height * 0.028),
+
+                        _AddExpenseButton(
+                          mq: mq,
+                          onTap: () async {
+                            await Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const AddExpenseScreen(),
+                              ),
+                            );
+
+                            fetchBudgetDetails();
+                          },
+                        ),
+                      ],
 
                       SizedBox(height: mq.height * 0.07),
                     ],
@@ -281,13 +353,11 @@ class _BudgetScreenState extends State<BudgetScreen> {
               ),
             ),
 
-            if (isLoading)
+            if (isLoading || isTeamsLoading)
               Container(
                 color: Colors.black.withOpacity(0.35),
                 child: const Center(
-                  child: CircularProgressIndicator(
-                    color: Colors.white,
-                  ),
+                  child: CircularProgressIndicator(color: Colors.white),
                 ),
               ),
           ],
@@ -297,14 +367,107 @@ class _BudgetScreenState extends State<BudgetScreen> {
   }
 }
 
-// -------------------- Total Spend Card Widget -----------------------
+class _TeamDropdown extends StatelessWidget {
+  final Size mq;
+  final List<MyTeamModel> teams;
+  final MyTeamModel? selectedTeam;
+  final bool isLoading;
+  final ValueChanged<MyTeamModel?> onChanged;
+
+  const _TeamDropdown({
+    required this.mq,
+    required this.teams,
+    required this.selectedTeam,
+    required this.isLoading,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: mq.height * 0.046,
+      width: mq.width * 0.34,
+      child: DropdownButtonFormField<MyTeamModel>(
+        value: selectedTeam,
+        isExpanded: true,
+        dropdownColor: const Color(0xFF287D80),
+        icon: Icon(
+          Icons.keyboard_arrow_down_rounded,
+          color: Colors.white,
+          size: mq.width * 0.045,
+        ),
+        items: teams.map((team) {
+          return DropdownMenuItem<MyTeamModel>(
+            value: team,
+            child: Text(
+              team.name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: mq.width * 0.027,
+                fontFamily: "Mynor",
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          );
+        }).toList(),
+        onChanged: isLoading ? null : onChanged,
+        hint: Text(
+          isLoading ? "Loading..." : "Teams",
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: mq.width * 0.027,
+            fontFamily: "Mynor",
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        decoration: InputDecoration(
+          contentPadding: EdgeInsets.symmetric(
+            horizontal: mq.width * 0.035,
+            vertical: 0,
+          ),
+          filled: true,
+          fillColor: const Color(0xFF4EB7BD).withOpacity(0.48),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(mq.width * 0.08),
+            borderSide: BorderSide(
+              color: Colors.white.withOpacity(0.65),
+              width: 1,
+            ),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(mq.width * 0.08),
+            borderSide: BorderSide(
+              color: Colors.white.withOpacity(0.9),
+              width: 1,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _TotalSpendCard extends StatelessWidget {
   final Size mq;
   final String totalSpend;
+  final String totalBudget;
+  final String remaining;
+  final String usagePercentage;
+  final String utilizedLabel;
+  final double progressValue;
 
   const _TotalSpendCard({
     required this.mq,
     required this.totalSpend,
+    required this.totalBudget,
+    required this.remaining,
+    required this.usagePercentage,
+    required this.utilizedLabel,
+    required this.progressValue,
   });
 
   @override
@@ -313,11 +476,11 @@ class _TotalSpendCard extends StatelessWidget {
 
     return _GlassCard(
       mq: mq,
-      height: mq.height * 0.135,
+      height: mq.height * 0.19,
       child: Padding(
         padding: EdgeInsets.symmetric(
           horizontal: mq.width * 0.07,
-          vertical: mq.height * 0.015,
+          vertical: mq.height * 0.017,
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -331,29 +494,50 @@ class _TotalSpendCard extends StatelessWidget {
                 fontWeight: FontWeight.w900,
               ),
             ),
-
-            SizedBox(height: mq.height * 0.006),
-
+            SizedBox(height: mq.height * 0.005),
             Text(
               totalSpend,
               style: TextStyle(
                 color: Colors.white,
-                fontSize: mq.width * 0.06,
+                fontSize: mq.width * 0.058,
                 fontFamily: "Mynor",
                 fontWeight: FontWeight.w900,
               ),
             ),
-
+            SizedBox(height: mq.height * 0.006),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    "Budget: $totalBudget",
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: mq.width * 0.026,
+                      fontFamily: "Mynor",
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                Text(
+                  "Remaining: $remaining",
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: mq.width * 0.026,
+                    fontFamily: "Mynor",
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
             const Spacer(),
-
             Row(
               children: [
                 Expanded(
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(mq.width * 0.03),
                     child: LinearProgressIndicator(
-                      value: 0.75,
-                      minHeight: mq.height * 0.0055,
+                      value: progressValue,
+                      minHeight: mq.height * 0.006,
                       backgroundColor: Colors.white,
                       valueColor: const AlwaysStoppedAnimation<Color>(
                         Color(0xFF287D80),
@@ -361,19 +545,27 @@ class _TotalSpendCard extends StatelessWidget {
                     ),
                   ),
                 ),
-
                 SizedBox(width: mq.width * 0.022),
-
                 Text(
-                  "75% of goal",
+                  usagePercentage,
                   style: TextStyle(
                     color: Colors.white,
-                    fontSize: mq.width * 0.026,
+                    fontSize: mq.width * 0.024,
                     fontFamily: "Mynor",
-                    fontWeight: FontWeight.w400,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
               ],
+            ),
+            SizedBox(height: mq.height * 0.006),
+            Text(
+              utilizedLabel,
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: mq.width * 0.024,
+                fontFamily: "Mynor",
+                fontWeight: FontWeight.w500,
+              ),
             ),
           ],
         ),
@@ -382,7 +574,71 @@ class _TotalSpendCard extends StatelessWidget {
   }
 }
 
-// -------------------- Expense Card Widget -----------------------
+class _AllocationCard extends StatelessWidget {
+  final Size mq;
+  final String category;
+  final String spent;
+  final int percentage;
+  final IconData icon;
+
+  const _AllocationCard({
+    required this.mq,
+    required this.category,
+    required this.spent,
+    required this.percentage,
+    required this.icon,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return _GlassCard(
+      mq: mq,
+      height: mq.height * 0.086,
+      child: Padding(
+        padding: EdgeInsets.symmetric(horizontal: mq.width * 0.048),
+        child: Row(
+          children: [
+            Icon(icon, color: Colors.white, size: mq.width * 0.052),
+            SizedBox(width: mq.width * 0.035),
+            Expanded(
+              child: Text(
+                category,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: mq.width * 0.034,
+                  fontFamily: "Mynor",
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ),
+            Text(
+              spent,
+              style: TextStyle(
+                color: const Color(0xFF287D80),
+                fontSize: mq.width * 0.031,
+                fontFamily: "Mynor",
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            SizedBox(width: mq.width * 0.02),
+            Text(
+              "$percentage%",
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: mq.width * 0.026,
+                fontFamily: "Mynor",
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _ExpenseCard extends StatelessWidget {
   final Size mq;
   final IconData icon;
@@ -411,14 +667,8 @@ class _ExpenseCard extends StatelessWidget {
         padding: EdgeInsets.symmetric(horizontal: mq.width * 0.048),
         child: Row(
           children: [
-            Icon(
-              icon,
-              color: Colors.white,
-              size: mq.width * 0.058,
-            ),
-
+            Icon(icon, color: Colors.white, size: mq.width * 0.058),
             SizedBox(width: mq.width * 0.04),
-
             Expanded(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -435,9 +685,7 @@ class _ExpenseCard extends StatelessWidget {
                       fontWeight: FontWeight.w900,
                     ),
                   ),
-
                   SizedBox(height: mq.height * 0.004),
-
                   Text(
                     category,
                     maxLines: 1,
@@ -452,9 +700,7 @@ class _ExpenseCard extends StatelessWidget {
                 ],
               ),
             ),
-
             SizedBox(width: mq.width * 0.02),
-
             Column(
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -469,9 +715,7 @@ class _ExpenseCard extends StatelessWidget {
                     fontWeight: FontWeight.w900,
                   ),
                 ),
-
                 SizedBox(height: mq.height * 0.006),
-
                 Text(
                   date,
                   maxLines: 1,
@@ -491,7 +735,6 @@ class _ExpenseCard extends StatelessWidget {
   }
 }
 
-// -------------------- Add Expense Button Widget -----------------------
 class _AddExpenseButton extends StatelessWidget {
   final Size mq;
   final VoidCallback onTap;
@@ -545,7 +788,6 @@ class _AddExpenseButton extends StatelessWidget {
   }
 }
 
-// -------------------- Glass Card Widget -----------------------
 class _GlassCard extends StatelessWidget {
   final Size mq;
   final double height;
@@ -562,10 +804,7 @@ class _GlassCard extends StatelessWidget {
     return ClipRRect(
       borderRadius: BorderRadius.circular(mq.width * 0.055),
       child: BackdropFilter(
-        filter: ImageFilter.blur(
-          sigmaX: 10,
-          sigmaY: 10,
-        ),
+        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
         child: Container(
           height: height,
           width: double.infinity,

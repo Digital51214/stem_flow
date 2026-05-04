@@ -2,6 +2,9 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 class ExpenseService {
+  static const String _url =
+      "https://backend.stem-flow.com/api/expenses/add";
+
   static Future<Map<String, dynamic>> addExpense({
     required int teamId,
     required String itemName,
@@ -9,8 +12,6 @@ class ExpenseService {
     required double amount,
     required String date,
   }) async {
-    final url = Uri.parse("https://backend.stem-flow.com/api/expenses/add");
-
     final body = {
       "team_id": teamId,
       "item_name": itemName,
@@ -19,23 +20,21 @@ class ExpenseService {
       "date": date,
     };
 
-    print("📤 REQUEST BODY: $body");
-
     final response = await http.post(
-      url,
-      headers: {"Content-Type": "application/json"},
+      Uri.parse(_url),
+      headers: {
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+      },
       body: jsonEncode(body),
     );
 
-    print("📥 RESPONSE STATUS: ${response.statusCode}");
-    print("📥 RESPONSE BODY: ${response.body}");
-
     final data = jsonDecode(response.body);
 
-    if (response.statusCode == 201) {
+    if (response.statusCode == 201 && data["status"] == 201) {
       return data;
     } else {
-      throw Exception(data["message"] ?? "API Error");
+      throw Exception(data["message"] ?? "Failed to add expense");
     }
   }
 }

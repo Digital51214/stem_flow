@@ -11,6 +11,7 @@ class SessionManager {
   static const String _keyIsLoggedIn = "is_logged_in";
   static const String _keyUserData = "user_data";
   static const String _keyUserId = "user_id";
+  static const String _keyTeamId = "team_id";
   static const String _keyUsername = "username";
   static const String _keyFullName = "full_name";
   static const String _keyEmail = "email";
@@ -31,6 +32,7 @@ class SessionManager {
       print("Incoming User Data: $user");
 
       final userId = _safeValue(user["id"]);
+      final teamId = _safeValue(user["team_id"]);
       final username = _safeValue(user["username"]);
       final fullName = _safeValue(user["full_name"]);
       final email = _safeValue(user["email"]);
@@ -41,6 +43,7 @@ class SessionManager {
 
       final normalizedUser = {
         "id": userId,
+        "team_id": teamId,
         "username": username,
         "full_name": fullName,
         "email": email,
@@ -53,6 +56,7 @@ class SessionManager {
       await _storage.write(key: _keyIsLoggedIn, value: "true");
       await _storage.write(key: _keyUserData, value: jsonEncode(normalizedUser));
       await _storage.write(key: _keyUserId, value: userId);
+      await _storage.write(key: _keyTeamId, value: teamId);
       await _storage.write(key: _keyUsername, value: username);
       await _storage.write(key: _keyFullName, value: fullName);
       await _storage.write(key: _keyEmail, value: email);
@@ -62,12 +66,31 @@ class SessionManager {
       await _storage.write(key: _keyUpdatedAt, value: updatedAt);
 
       print("=== SAVE USER SESSION SUCCESS ===");
+      print("Saved user_id: $userId");
+      print("Saved team_id: $teamId");
       print("Saved full_name: $fullName");
       print("Saved email: $email");
-      print("Saved profile_pic: $profilePic");
     } catch (e) {
       print("=== SAVE USER SESSION ERROR ===");
       print("Error: $e");
+    }
+  }
+
+  Future<void> saveTeamId(dynamic teamId) async {
+    final value = _safeValue(teamId);
+    await _storage.write(key: _keyTeamId, value: value);
+    print("Saved team_id: $value");
+  }
+
+  Future<int> getTeamId() async {
+    try {
+      final value = await _storage.read(key: _keyTeamId) ?? "";
+      print("getTeamId: $value");
+      return int.tryParse(value) ?? 0;
+    } catch (e) {
+      print("=== GET TEAM ID ERROR ===");
+      print("Error: $e");
+      return 0;
     }
   }
 

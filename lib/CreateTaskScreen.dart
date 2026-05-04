@@ -1,15 +1,15 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:stemflow/Services/add_task_service.dart';
-import 'package:stemflow/Services/show_phase_service.dart';
 import 'package:stemflow/Services/team_details_service.dart';
+import 'package:stemflow/Services/user_phase_service.dart';
 import 'package:stemflow/TaskDetailScreen.dart';
 import 'package:stemflow/Widgets/backcircle.dart';
 import 'package:stemflow/Widgets/background.dart';
 import 'package:stemflow/models/member_model.dart';
-import 'package:stemflow/models/phase_model.dart';
+import 'package:stemflow/models/user_phase_model.dart';
 import 'package:stemflow/Services/session_manager.dart';
-import 'package:stemflow/team_side%20screens/BottomNavigation_screen_teamSide.dart'; // Added import for SessionManager
+import 'package:stemflow/team_side%20screens/BottomNavigation_screen_teamSide.dart';
 
 class CreateTaskScreen extends StatefulWidget {
   final int projectId;
@@ -26,24 +26,22 @@ class CreateTaskScreen extends StatefulWidget {
 }
 
 class _CreateTaskScreenState extends State<CreateTaskScreen> {
-  // ── Controllers ──
   final TextEditingController _titleController = TextEditingController();
 
-  // ── Loading states ──
   bool _isLoadingPhases = false;
   bool _isLoadingMembers = false;
   bool _isCreatingTask = false;
 
-  // ── Data ──
-  List<PhaseModel> _phases = [];
-  PhaseModel? _selectedPhase;
+  List<UserPhaseModel> _phases = [];
+  UserPhaseModel? _selectedPhase;
 
   List<MemberModel> _members = [];
   MemberModel? _selectedMember;
 
-  // ── Other fields ──
   String selectedPriority = "LOW";
   DateTime? selectedDate;
+
+  final String apiKey = "YOUR_API_KEY_HERE";
 
   @override
   void initState() {
@@ -58,27 +56,29 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
     super.dispose();
   }
 
-  // ── Fetch Phases ──
   Future<void> _fetchPhases() async {
     setState(() => _isLoadingPhases = true);
+
     try {
       final userIdText = await SessionManager.instance.getUserId();
       final userId = int.tryParse(userIdText) ?? 0;
 
-      print('[CreateTaskScreen] Fetching phases — userId: $userId, projectId: ${widget.projectId}');
-
-      final result = await ShowPhaseService.getProjectPhases(
+      final result = await UserPhaseService.getUserPhases(
         userId: userId,
-        projectId: widget.projectId,
-        // apiKey hata diya ✓
+        apiKey: apiKey,
       );
-      if (!mounted) return;
-      setState(() => _phases = result);
 
-      print('[CreateTaskScreen] Phases loaded: ${_phases.length}');
+      if (!mounted) return;
+
+      setState(() {
+        _phases = result;
+        if (_phases.isNotEmpty) {
+          _selectedPhase = _phases.first;
+        }
+      });
     } catch (e) {
       if (!mounted) return;
-      print('[CreateTaskScreen] Phase error: $e');
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Phases: ${e.toString()}')),
       );
@@ -88,17 +88,25 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
     }
   }
 
-  // ── Fetch Members ──
   Future<void> _fetchMembers() async {
     setState(() => _isLoadingMembers = true);
+
     try {
       final result = await GetTeamMembersService.getMembers(
         teamId: widget.teamId,
       );
+
       if (!mounted) return;
-      setState(() => _members = result);
+
+      setState(() {
+        _members = result;
+        if (_members.isNotEmpty) {
+          _selectedMember = _members.first;
+        }
+      });
     } catch (e) {
       if (!mounted) return;
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Members: ${e.toString()}')),
       );
@@ -108,9 +116,7 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
     }
   }
 
-  // ── Create Task ──
   Future<void> _createTask() async {
-    // ── Validation ──
     final String title = _titleController.text.trim();
 
     if (title.isEmpty) {
@@ -146,7 +152,7 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
       final userId = int.tryParse(userIdText) ?? 0;
 
       final Map<String, dynamic> createdTask = await AddTaskService.addTask(
-        userId: userId,  // Now using dynamic userId
+        userId: userId,
         teamId: widget.teamId,
         phaseId: _selectedPhase!.id,
         title: title,
@@ -171,6 +177,7 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
       );
     } catch (e) {
       if (!mounted) return;
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error: ${e.toString()}'),
@@ -185,6 +192,7 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
 
   String get formattedDate {
     if (selectedDate == null) return "mm/dd/yy";
+
     return "${selectedDate!.month.toString().padLeft(2, '0')}/"
         "${selectedDate!.day.toString().padLeft(2, '0')}/"
         "${selectedDate!.year.toString().substring(2)}";
@@ -244,8 +252,6 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     SizedBox(height: mq.height * 0.035),
-
-                    // ── Top Bar ──
                     Row(
                       children: [
                         BackCircle(onTap: () => Navigator.pop(context)),
@@ -262,9 +268,7 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
                         ),
                       ],
                     ),
-
                     SizedBox(height: mq.height * 0.03),
-
                     Text(
                       "New Task",
                       style: TextStyle(
@@ -274,9 +278,7 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
                         fontWeight: FontWeight.w900,
                       ),
                     ),
-
                     SizedBox(height: mq.height * 0.014),
-
                     _GlassCard(
                       height: mq.height * 0.76,
                       child: Padding(
@@ -287,8 +289,6 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-
-                            // ── Task Title ──
                             _FieldLabel(text: "TASK TITLE", mq: mq),
                             SizedBox(height: mq.height * 0.016),
                             _InputBox(
@@ -296,55 +296,71 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
                               hintText: "e.g. Aerodynamics Lead",
                               controller: _titleController,
                             ),
-
                             SizedBox(height: mq.height * 0.026),
 
-                            // ── Phase Dropdown ──
                             _FieldLabel(text: "PHASE", mq: mq),
                             SizedBox(height: mq.height * 0.016),
                             _isLoadingPhases
-                                ? _LoadingBox(mq: mq, label: "Loading phases...")
+                                ? _LoadingBox(
+                              mq: mq,
+                              label: "Loading phases...",
+                            )
                                 : _phases.isEmpty
-                                ? _EmptyBox(mq: mq, label: "No phases found")
+                                ? _EmptyBox(
+                              mq: mq,
+                              label: "No phases found",
+                            )
                                 : _PhaseDropdownBox(
                               mq: mq,
                               value: _selectedPhase,
                               phases: _phases,
-                              onChanged: (val) =>
-                                  setState(() => _selectedPhase = val),
+                              onChanged: (val) {
+                                setState(() {
+                                  _selectedPhase = val;
+                                });
+                              },
                             ),
 
                             SizedBox(height: mq.height * 0.026),
 
-                            // ── Assigned To Dropdown ──
                             _FieldLabel(text: "ASSIGNED TO", mq: mq),
                             SizedBox(height: mq.height * 0.016),
                             _isLoadingMembers
-                                ? _LoadingBox(mq: mq, label: "Loading members...")
+                                ? _LoadingBox(
+                              mq: mq,
+                              label: "Loading members...",
+                            )
                                 : _members.isEmpty
-                                ? _EmptyBox(mq: mq, label: "No members found")
+                                ? _EmptyBox(
+                              mq: mq,
+                              label: "No members found",
+                            )
                                 : _MemberDropdownBox(
                               mq: mq,
                               value: _selectedMember,
                               members: _members,
-                              onChanged: (val) =>
-                                  setState(() => _selectedMember = val),
+                              onChanged: (val) {
+                                setState(() {
+                                  _selectedMember = val;
+                                });
+                              },
                             ),
 
                             SizedBox(height: mq.height * 0.026),
 
-                            // ── Priority ──
                             _FieldLabel(text: "PRIORITY", mq: mq),
                             SizedBox(height: mq.height * 0.016),
                             _PrioritySelector(
                               selectedPriority: selectedPriority,
-                              onSelect: (value) =>
-                                  setState(() => selectedPriority = value),
+                              onSelect: (value) {
+                                setState(() {
+                                  selectedPriority = value;
+                                });
+                              },
                             ),
 
                             SizedBox(height: mq.height * 0.026),
 
-                            // ── Due Date ──
                             _FieldLabel(text: "DUE DATE", mq: mq),
                             SizedBox(height: mq.height * 0.016),
                             _DateBox(
@@ -355,7 +371,6 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
 
                             SizedBox(height: mq.height * 0.026),
 
-                            // ── Initial Status ──
                             _FieldLabel(text: "INITIAL STATUS", mq: mq),
                             SizedBox(height: mq.height * 0.016),
                             _StatusBox(mq: mq),
@@ -363,23 +378,20 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
                         ),
                       ),
                     ),
-
                     SizedBox(height: mq.height * 0.028),
-
                     _CreateTaskButton(
                       height: mq.height * 0.056,
                       isLoading: _isCreatingTask,
                       onTap: _isCreatingTask ? null : _createTask,
                     ),
-
                     SizedBox(height: mq.height * 0.028),
-
                     GestureDetector(
                       onTap: () {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                              builder: (context) => WidgetTree2()),
+                            builder: (context) => WidgetTree2(),
+                          ),
                         );
                       },
                       child: Center(
@@ -394,7 +406,6 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
                         ),
                       ),
                     ),
-
                     SizedBox(height: mq.height * 0.08),
                   ],
                 ),
@@ -407,13 +418,11 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
   }
 }
 
-// ─── Phase Dropdown ───────────────────────────────────────────────────────────
-
 class _PhaseDropdownBox extends StatelessWidget {
   final Size mq;
-  final PhaseModel? value;
-  final List<PhaseModel> phases;
-  final ValueChanged<PhaseModel?> onChanged;
+  final UserPhaseModel? value;
+  final List<UserPhaseModel> phases;
+  final ValueChanged<UserPhaseModel?> onChanged;
 
   const _PhaseDropdownBox({
     required this.mq,
@@ -429,10 +438,13 @@ class _PhaseDropdownBox extends StatelessWidget {
       padding: EdgeInsets.symmetric(horizontal: mq.width * 0.03),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(mq.width * 0.08),
-        border: Border.all(color: Colors.white.withOpacity(0.65), width: 1),
+        border: Border.all(
+          color: Colors.white.withOpacity(0.65),
+          width: 1,
+        ),
       ),
       child: DropdownButtonHideUnderline(
-        child: DropdownButton<PhaseModel>(
+        child: DropdownButton<UserPhaseModel>(
           value: value,
           isExpanded: true,
           dropdownColor: const Color(0xFF8CCDCF),
@@ -450,37 +462,39 @@ class _PhaseDropdownBox extends StatelessWidget {
             color: Colors.white,
             size: mq.width * 0.062,
           ),
-          selectedItemBuilder: (_) => phases.map((ph) {
-            return Row(
-              children: [
-                Container(
-                  width: 7,
-                  height: 7,
-                  margin: const EdgeInsets.only(right: 8),
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: ph.isActive
-                        ? const Color(0xFF287D80)
-                        : Colors.white54,
-                  ),
-                ),
-                Expanded(
-                  child: Text(
-                    ph.phaseName,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: mq.width * 0.035,
-                      fontFamily: "Mynor",
-                      fontWeight: FontWeight.w600,
+          selectedItemBuilder: (_) {
+            return phases.map((ph) {
+              return Row(
+                children: [
+                  Container(
+                    width: 7,
+                    height: 7,
+                    margin: const EdgeInsets.only(right: 8),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: ph.isActive
+                          ? const Color(0xFF287D80)
+                          : Colors.white54,
                     ),
                   ),
-                ),
-              ],
-            );
-          }).toList(),
+                  Expanded(
+                    child: Text(
+                      ph.phaseName,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: mq.width * 0.035,
+                        fontFamily: "Mynor",
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            }).toList();
+          },
           items: phases.map((ph) {
-            return DropdownMenuItem<PhaseModel>(
+            return DropdownMenuItem<UserPhaseModel>(
               value: ph,
               child: Row(
                 children: [
@@ -508,7 +522,7 @@ class _PhaseDropdownBox extends StatelessWidget {
                     ),
                   ),
                   Text(
-                    "${ph.progressPercentage.toInt()}%",
+                    "${ph.progressPercentage}%",
                     style: TextStyle(
                       color: const Color(0xFF287D80).withOpacity(0.65),
                       fontSize: mq.width * 0.028,
@@ -526,8 +540,6 @@ class _PhaseDropdownBox extends StatelessWidget {
     );
   }
 }
-
-// ─── Member Dropdown ──────────────────────────────────────────────────────────
 
 class _MemberDropdownBox extends StatelessWidget {
   final Size mq;
@@ -551,6 +563,7 @@ class _MemberDropdownBox extends StatelessWidget {
         backgroundColor: const Color(0xFF287D80),
       );
     }
+
     return CircleAvatar(
       radius: radius,
       backgroundColor: const Color(0xFF287D80),
@@ -573,7 +586,10 @@ class _MemberDropdownBox extends StatelessWidget {
       padding: EdgeInsets.symmetric(horizontal: mq.width * 0.03),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(mq.width * 0.08),
-        border: Border.all(color: Colors.white.withOpacity(0.65), width: 1),
+        border: Border.all(
+          color: Colors.white.withOpacity(0.65),
+          width: 1,
+        ),
       ),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<MemberModel>(
@@ -594,26 +610,28 @@ class _MemberDropdownBox extends StatelessWidget {
             color: Colors.white,
             size: mq.width * 0.062,
           ),
-          selectedItemBuilder: (_) => members.map((m) {
-            return Row(
-              children: [
-                _avatar(m, mq.width * 0.04),
-                SizedBox(width: mq.width * 0.025),
-                Expanded(
-                  child: Text(
-                    m.username,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: mq.width * 0.035,
-                      fontFamily: "Mynor",
-                      fontWeight: FontWeight.w600,
+          selectedItemBuilder: (_) {
+            return members.map((m) {
+              return Row(
+                children: [
+                  _avatar(m, mq.width * 0.04),
+                  SizedBox(width: mq.width * 0.025),
+                  Expanded(
+                    child: Text(
+                      m.username,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: mq.width * 0.035,
+                        fontFamily: "Mynor",
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
-                ),
-              ],
-            );
-          }).toList(),
+                ],
+              );
+            }).toList();
+          },
           items: members.map((m) {
             return DropdownMenuItem<MemberModel>(
               value: m,
@@ -638,6 +656,7 @@ class _MemberDropdownBox extends StatelessWidget {
                         ),
                         Text(
                           m.role,
+                          overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             color: const Color(0xFF287D80).withOpacity(0.65),
                             fontSize: mq.width * 0.027,
@@ -659,12 +678,14 @@ class _MemberDropdownBox extends StatelessWidget {
   }
 }
 
-// ─── Loading / Empty Box ──────────────────────────────────────────────────────
-
 class _LoadingBox extends StatelessWidget {
   final Size mq;
   final String label;
-  const _LoadingBox({required this.mq, required this.label});
+
+  const _LoadingBox({
+    required this.mq,
+    required this.label,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -673,7 +694,10 @@ class _LoadingBox extends StatelessWidget {
       padding: EdgeInsets.symmetric(horizontal: mq.width * 0.055),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(mq.width * 0.08),
-        border: Border.all(color: Colors.white.withOpacity(0.65), width: 1),
+        border: Border.all(
+          color: Colors.white.withOpacity(0.65),
+          width: 1,
+        ),
       ),
       child: Row(
         children: [
@@ -681,7 +705,9 @@ class _LoadingBox extends StatelessWidget {
             height: 14,
             width: 14,
             child: CircularProgressIndicator(
-                color: Colors.white, strokeWidth: 2),
+              color: Colors.white,
+              strokeWidth: 2,
+            ),
           ),
           SizedBox(width: mq.width * 0.03),
           Text(
@@ -701,7 +727,11 @@ class _LoadingBox extends StatelessWidget {
 class _EmptyBox extends StatelessWidget {
   final Size mq;
   final String label;
-  const _EmptyBox({required this.mq, required this.label});
+
+  const _EmptyBox({
+    required this.mq,
+    required this.label,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -710,7 +740,10 @@ class _EmptyBox extends StatelessWidget {
       padding: EdgeInsets.symmetric(horizontal: mq.width * 0.055),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(mq.width * 0.08),
-        border: Border.all(color: Colors.white.withOpacity(0.4), width: 1),
+        border: Border.all(
+          color: Colors.white.withOpacity(0.4),
+          width: 1,
+        ),
       ),
       alignment: Alignment.centerLeft,
       child: Text(
@@ -725,12 +758,14 @@ class _EmptyBox extends StatelessWidget {
   }
 }
 
-// ─── Existing Widgets ─────────────────────────────────────────────────────────
-
 class _FieldLabel extends StatelessWidget {
   final String text;
   final Size mq;
-  const _FieldLabel({required this.text, required this.mq});
+
+  const _FieldLabel({
+    required this.text,
+    required this.mq,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -785,12 +820,17 @@ class _InputBox extends StatelessWidget {
           ),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(mq.width * 0.08),
-            borderSide:
-            BorderSide(color: Colors.white.withOpacity(0.65), width: 1),
+            borderSide: BorderSide(
+              color: Colors.white.withOpacity(0.65),
+              width: 1,
+            ),
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(mq.width * 0.08),
-            borderSide: const BorderSide(color: Colors.white, width: 1.2),
+            borderSide: const BorderSide(
+              color: Colors.white,
+              width: 1.2,
+            ),
           ),
         ),
       ),
@@ -801,33 +841,43 @@ class _InputBox extends StatelessWidget {
 class _PrioritySelector extends StatelessWidget {
   final String selectedPriority;
   final ValueChanged<String> onSelect;
-  const _PrioritySelector(
-      {required this.selectedPriority, required this.onSelect});
+
+  const _PrioritySelector({
+    required this.selectedPriority,
+    required this.onSelect,
+  });
 
   @override
   Widget build(BuildContext context) {
     final mq = MediaQuery.of(context).size;
+
     return Container(
       height: mq.height * 0.055,
       padding: EdgeInsets.symmetric(horizontal: mq.width * 0.01),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(mq.width * 0.08),
-        border: Border.all(color: Colors.white.withOpacity(0.65), width: 1),
+        border: Border.all(
+          color: Colors.white.withOpacity(0.65),
+          width: 1,
+        ),
       ),
       child: Row(
         children: [
           _PriorityChip(
-              text: "LOW",
-              selectedPriority: selectedPriority,
-              onSelect: onSelect),
+            text: "LOW",
+            selectedPriority: selectedPriority,
+            onSelect: onSelect,
+          ),
           _PriorityChip(
-              text: "MEDIUM",
-              selectedPriority: selectedPriority,
-              onSelect: onSelect),
+            text: "MEDIUM",
+            selectedPriority: selectedPriority,
+            onSelect: onSelect,
+          ),
           _PriorityChip(
-              text: "HIGH",
-              selectedPriority: selectedPriority,
-              onSelect: onSelect),
+            text: "HIGH",
+            selectedPriority: selectedPriority,
+            onSelect: onSelect,
+          ),
         ],
       ),
     );
@@ -838,15 +888,18 @@ class _PriorityChip extends StatelessWidget {
   final String text;
   final String selectedPriority;
   final ValueChanged<String> onSelect;
-  const _PriorityChip(
-      {required this.text,
-        required this.selectedPriority,
-        required this.onSelect});
+
+  const _PriorityChip({
+    required this.text,
+    required this.selectedPriority,
+    required this.onSelect,
+  });
 
   @override
   Widget build(BuildContext context) {
     final mq = MediaQuery.of(context).size;
     final isSelected = selectedPriority == text;
+
     return Expanded(
       child: GestureDetector(
         onTap: () => onSelect(text),
@@ -876,8 +929,12 @@ class _DateBox extends StatelessWidget {
   final Size mq;
   final String dateText;
   final VoidCallback onTap;
-  const _DateBox(
-      {required this.mq, required this.dateText, required this.onTap});
+
+  const _DateBox({
+    required this.mq,
+    required this.dateText,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -888,8 +945,10 @@ class _DateBox extends StatelessWidget {
         padding: EdgeInsets.symmetric(horizontal: mq.width * 0.055),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(mq.width * 0.08),
-          border:
-          Border.all(color: Colors.white.withOpacity(0.65), width: 1),
+          border: Border.all(
+            color: Colors.white.withOpacity(0.65),
+            width: 1,
+          ),
         ),
         child: Row(
           children: [
@@ -904,8 +963,11 @@ class _DateBox extends StatelessWidget {
                 ),
               ),
             ),
-            Icon(Icons.calendar_month_outlined,
-                color: Colors.white, size: mq.width * 0.052),
+            Icon(
+              Icons.calendar_month_outlined,
+              color: Colors.white,
+              size: mq.width * 0.052,
+            ),
           ],
         ),
       ),
@@ -915,7 +977,10 @@ class _DateBox extends StatelessWidget {
 
 class _StatusBox extends StatelessWidget {
   final Size mq;
-  const _StatusBox({required this.mq});
+
+  const _StatusBox({
+    required this.mq,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -924,8 +989,10 @@ class _StatusBox extends StatelessWidget {
       padding: EdgeInsets.symmetric(horizontal: mq.width * 0.055),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(mq.width * 0.08),
-        border:
-        Border.all(color: Colors.white.withOpacity(0.65), width: 1),
+        border: Border.all(
+          color: Colors.white.withOpacity(0.65),
+          width: 1,
+        ),
       ),
       child: Row(
         children: [
@@ -953,8 +1020,6 @@ class _StatusBox extends StatelessWidget {
   }
 }
 
-// ─── Create Task Button (with loader) ────────────────────────────────────────
-
 class _CreateTaskButton extends StatelessWidget {
   final double height;
   final VoidCallback? onTap;
@@ -969,6 +1034,7 @@ class _CreateTaskButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final mq = MediaQuery.of(context).size;
+
     return Container(
       height: height,
       decoration: BoxDecoration(
@@ -1005,27 +1071,35 @@ class _CreateTaskButton extends StatelessWidget {
   }
 }
 
-// ─── Glass Card ───────────────────────────────────────────────────────────────
-
 class _GlassCard extends StatelessWidget {
   final double height;
   final Widget child;
-  const _GlassCard({required this.height, required this.child});
+
+  const _GlassCard({
+    required this.height,
+    required this.child,
+  });
 
   @override
   Widget build(BuildContext context) {
     final mq = MediaQuery.of(context).size;
+
     return ClipRRect(
       borderRadius: BorderRadius.circular(mq.width * 0.055),
       child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+        filter: ImageFilter.blur(
+          sigmaX: 10,
+          sigmaY: 10,
+        ),
         child: Container(
           height: height,
           decoration: BoxDecoration(
             color: const Color(0xFF4EB7BD).withOpacity(0.5),
             borderRadius: BorderRadius.circular(mq.width * 0.055),
             border: Border.all(
-                color: Colors.white.withOpacity(0.18), width: 1),
+              color: Colors.white.withOpacity(0.18),
+              width: 1,
+            ),
           ),
           child: child,
         ),

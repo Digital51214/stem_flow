@@ -1,11 +1,13 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:stemflow/BottomNavigation_screen.dart';
-import 'package:stemflow/EventsScreen.dart';
 import 'package:stemflow/Widgets/backcircle.dart';
 import 'package:stemflow/Widgets/background.dart';
 
 import '../Services/add_event_service.dart';
+import '../Services/session_manager.dart';
+import '../Services/team_list_service.dart';
+import '../models/teams_models.dart';
 
 class AddEventScreen extends StatefulWidget {
   const AddEventScreen({super.key});
@@ -21,8 +23,47 @@ class _AddEventScreenState extends State<AddEventScreen> {
   TextEditingController(text: "03:45 PM");
 
   bool isLoading = false;
+  bool isTeamsLoading = false;
 
-  final int teamId = 1;
+  int teamId = 0;
+  MyTeamModel? selectedTeam;
+  List<MyTeamModel> teams = [];
+
+  @override
+  void initState() {
+    super.initState();
+    fetchTeams();
+  }
+
+  Future<void> fetchTeams() async {
+    setState(() => isTeamsLoading = true);
+
+    try {
+      final userIdText = await SessionManager.instance.getUserId();
+      final userId = int.tryParse(userIdText) ?? 0;
+
+      final result = await MyTeamService.getMyTeams(
+        userId: userId,
+        apiKey: "YOUR_API_KEY_HERE",
+      );
+
+      if (!mounted) return;
+
+      setState(() {
+        teams = result;
+        if (teams.isNotEmpty) {
+          selectedTeam = teams.first;
+          teamId = teams.first.id;
+        }
+      });
+    } catch (e) {
+      showToast("Failed to load teams");
+    } finally {
+      if (mounted) {
+        setState(() => isTeamsLoading = false);
+      }
+    }
+  }
 
   @override
   void dispose() {
@@ -35,37 +76,39 @@ class _AddEventScreenState extends State<AddEventScreen> {
   void showToast(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(
-          message,
-          style: const TextStyle(color: Colors.white),
-        ),
+        content: Text(message, style: const TextStyle(color: Colors.white)),
         backgroundColor: const Color(0xFF287D80),
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(14),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       ),
     );
   }
 
   String convertDateToApiFormat(String date) {
-    final parts = date.split('/');
+    try {
+      final parts = date.split('/');
 
-    if (parts.length != 3) {
+      if (parts.length != 3) return date;
+
+      final month = parts[0].padLeft(2, '0');
+      final day = parts[1].padLeft(2, '0');
+      final year = parts[2];
+
+      return "$year-$month-$day";
+    } catch (e) {
       return date;
     }
-
-    final month = parts[0];
-    final day = parts[1];
-    final year = parts[2];
-
-    return "$year-$month-$day";
   }
 
   Future<void> saveEvent() async {
     final title = eventTitleController.text.trim();
     final date = dateController.text.trim();
     final time = timeController.text.trim();
+
+    if (selectedTeam == null || teamId == 0) {
+      showToast("Please select team");
+      return;
+    }
 
     if (title.isEmpty) {
       showToast("Please enter event title");
@@ -82,19 +125,10 @@ class _AddEventScreenState extends State<AddEventScreen> {
       return;
     }
 
-    setState(() {
-      isLoading = true;
-    });
+    setState(() => isLoading = true);
 
     try {
-      print("Save Event Button Pressed");
-      print("Title: $title");
-      print("Date Before Convert: $date");
-      print("Time: $time");
-
       final apiDate = convertDateToApiFormat(date);
-
-      print("Date For API: $apiDate");
 
       final result = await AddEventService.addEvent(
         teamId: teamId,
@@ -103,29 +137,25 @@ class _AddEventScreenState extends State<AddEventScreen> {
         time: time,
       );
 
-      print("Event Added Successfully: $result");
-
-      showToast(result["message"] ?? "Event synchronized successfully");
+      showToast(result["message"] ?? "Event added successfully");
 
       eventTitleController.clear();
       dateController.clear();
       timeController.text = "03:45 PM";
 
-      if (mounted) {
-        Navigator.pushAndRemoveUntil(
-          context,
-          MaterialPageRoute(builder: (context) => WidgetTree()),
-              (Route<dynamic> route) => false,
-        );
-      }
+      if (!mounted) return;
+
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (context) => WidgetTree()),
+            (Route<dynamic> route) => false,
+      );
     } catch (e) {
       print("Save Event Error: $e");
       showToast("Failed to add event");
     } finally {
       if (mounted) {
-        setState(() {
-          isLoading = false;
-        });
+        setState(() => isLoading = false);
       }
     }
   }
@@ -161,11 +191,7 @@ class _AddEventScreenState extends State<AddEventScreen> {
                     SizedBox(height: mq.height * 0.045),
                     Row(
                       children: [
-                        BackCircle(
-                          onTap: () {
-                            Navigator.pop(context);
-                          },
-                        ),
+                        BackCircle(onTap: () => Navigator.pop(context)),
                         const Spacer(),
                         Container(
                           height: mq.height * 0.06,
@@ -197,17 +223,34 @@ class _AddEventScreenState extends State<AddEventScreen> {
                       child: Padding(
                         padding: EdgeInsets.symmetric(
                           horizontal: mq.width * 0.06,
-                          vertical: mq.height * 0.03,
+                          vertical: mq.height * 0.015,
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
+                            _FieldLabel(mq: mq, title: "TEAM"),
+                            SizedBox(height: mq.height * 0.014),
+                            _TeamDropdown(
+                              mq: mq,
+                              teams: teams,
+                              selectedTeam: selectedTeam,
+                              isLoading: isTeamsLoading,
+                              onChanged: (team) {
+                                if (team == null) return;
+
+                                setState(() {
+                                  selectedTeam = team;
+                                  teamId = team.id;
+                                });
+                              },
+                            ),
+                            SizedBox(height: mq.height * 0.03),
                             _FieldLabel(mq: mq, title: "EVENT TITLE"),
                             SizedBox(height: mq.height * 0.014),
                             _EventTextField(
                               mq: mq,
                               controller: eventTitleController,
-                              hintText: "e.g. Aerodynamics Review",
+                              hintText: "e.g. Weekly Team Meeting",
                               suffixIcon: Icons.edit_rounded,
                             ),
                             SizedBox(height: mq.height * 0.03),
@@ -275,6 +318,86 @@ class _AddEventScreenState extends State<AddEventScreen> {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _TeamDropdown extends StatelessWidget {
+  final Size mq;
+  final List<MyTeamModel> teams;
+  final MyTeamModel? selectedTeam;
+  final bool isLoading;
+  final ValueChanged<MyTeamModel?> onChanged;
+
+  const _TeamDropdown({
+    required this.mq,
+    required this.teams,
+    required this.selectedTeam,
+    required this.isLoading,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: mq.height * 0.058,
+      child: DropdownButtonFormField<MyTeamModel>(
+        value: selectedTeam,
+        isExpanded: true,
+        dropdownColor: const Color(0xFF287D80),
+        icon: const Icon(
+          Icons.arrow_drop_down_outlined,
+          color: Colors.white,
+        ),
+        items: teams.map((team) {
+          return DropdownMenuItem<MyTeamModel>(
+            value: team,
+            child: Text(
+              team.name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: mq.width * 0.03,
+                fontFamily: "Mynor",
+                fontWeight: FontWeight.w400,
+              ),
+            ),
+          );
+        }).toList(),
+        onChanged: isLoading ? null : onChanged,
+        hint: Text(
+          isLoading ? "Loading teams..." : "Select Team",
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: mq.width * 0.03,
+            fontFamily: "Mynor",
+            fontWeight: FontWeight.w400,
+          ),
+        ),
+        decoration: InputDecoration(
+          contentPadding: EdgeInsets.symmetric(
+            horizontal: mq.width * 0.05,
+            vertical: mq.height * 0.014,
+          ),
+          filled: true,
+          fillColor: Colors.white.withOpacity(0.05),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(mq.width * 0.08),
+            borderSide: BorderSide(
+              color: Colors.white.withOpacity(0.65),
+              width: 1,
+            ),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(mq.width * 0.08),
+            borderSide: BorderSide(
+              color: Colors.white.withOpacity(0.9),
+              width: 1,
+            ),
+          ),
         ),
       ),
     );
@@ -525,7 +648,7 @@ class _GlassFormCard extends StatelessWidget {
           sigmaY: 10,
         ),
         child: Container(
-          height: mq.height * 0.419,
+          height: mq.height * 0.49,
           width: double.infinity,
           decoration: BoxDecoration(
             color: const Color(0xFF4EB7BD).withOpacity(0.48),
